@@ -1,0 +1,112 @@
+---
+title: "TITLE"
+subtitle: "SUBTITLE"
+author: "Ali Jabir and Isis Martinez"
+thanks: "Project repository available at: [https://github.com/syedalijabir/math252-project](https://github.com/syedalijabir/math252-project)."
+date: "May XXX, 2025"
+format:
+  pdf:
+    number-sections: true
+execute:
+  echo: false
+  warning: false
+  message: false
+  include: true
+  fig-width: 4    # default width (in inches)
+  fig-height: 3   # default height (in inches)
+  abstract: "In this project, we investigate unsupervised clustering methods for discovering latent structure in user-movie interaction data using the MovieLens 1M dataset. The study combines representation learning and clustering by first learning dense latent embeddings through a multilayer perceptron (MLP) with embedding dimensions of 64, 128, and 256, and then applying several clustering procedures to those learned representations. The clustering methods considered include k-means, PD clustering, reduced k-means, and factorial PD clustering. The objective is to determine which combination of embedding size and clustering method best captures meaningful structure in the data. We seek to identify natural clustering to identify natural groupings among observations without relying on labeled outcomes. Therefore, we will use the learned embeddings to provide a compact latent representation of user-item interaction patterns, and use the clustering to uncover groups of users or items that exhibit similar behavioral or structural characteristics. The clustering quality will be assessed using internal validation criteria and interpretability of the resulting groups. This project is intended to show how latent representation learning combined with modern clustering techniques can reveal useful structure in recommender-system data beyond traditional prediction-based analyses. **NOTE**: Add any other information needed with code and results later"
+  bibliography: references.bib
+  body-footer: Math 252 - Cluster Analysis | Spring 2026 Project
+---
+
+
+
+# Introduction {#sec-intro}
+Clustering is one of the central techniques in unsupervised learning and is widely used to uncover hidden structure in high-dimensional data. In contrast to supervised learning methods, which require labeled outcomes, clustering can partition observations into groups whose members are similar to one another and dissimilar to members of other groups. Because the true grouping structure is generally unknown in advance, clustering is especially useful for exploratory analysis, data summarization, segmentation, and downstream modeling.
+
+In the context of movie recommendation data, clustering provides a perspective that differs from predictive recommendation methods. Rather than attempting to estimate whether a user will like a particular movie or to rank future recommendations, we can use clustering to identify groups of movies with similar audience patterns or genres, or low-dimensional subspaces in which such structure becomes more visible. This type of analysis can provide insight into latent preference structures, genre affinities, and patterns of interaction that may not be immediately apparent from the raw user-item rating matrix.
+
+The MovieLens datasets have long served as standard benchmarks in machine learning and recommender-systems research because they contain rich and structured information about user ratings of movies. In this project, we use the MovieLens 1M dataset and combine learned latent embeddings with clustering methods to study whether compact neural representations improve the quality of clustering outcomes.
+
+We plan to learn embeddings using an MLP-based model and then apply multiple clustering procedures to those embeddings. We will consider embedding dimensions of 64, 128, and 256. For each embedding space, we will apply several clustering methods, including k-means, PD clustering, reduced k-means, and factorial PD clustering. We will then compare the resulting clusterings to identify which approach best captures meaningful and stable structure in the data. In this way, the project brings together ideas from neural representation learning, partition-based clustering, dimension reduction, and cluster validation.
+
+This report is organized as follows. Section II provides background on clustering, latent representations, and the clustering methods most relevant to this study. Section III describes the MovieLens 1M dataset and the preprocessing steps used to prepare the data. Section IV outlines the methods and experimental design, including the learned embedding models and the clustering procedures applied to them. Section V presents the evaluation framework used to compare clustering solutions. Section VI is reserved for experimental results and their interpretation. Finally, Section VII concludes the report and discusses directions for future work.
+
+# Background {#sec-back}
+Clustering methods attempt to divide observations into groups according to a notion of proximity or similarity. The definition of similarity is fundamental to the success of any clustering procedure, and in many settings it is determined by a distance function. Common distance measures include Euclidean distance, which is widely used in centroid-based methods such as k-means, and Mahalanobis distance, which accounts for covariance structure and can be more appropriate when variables are correlated or differently scaled. In high-dimensional applications, the choice of distance metric can substantially affect both the geometry of the data and the quality of the resulting clusters.
+
+Among the best-known partition-based clustering methods is k-means, which partitions observations into a fixed number of clusters by minimizing within-cluster variation. The method is computationally efficient and conceptually simple, making it a natural baseline for many clustering studies. However, k-means assumes clusters are approximately spherical in the feature space and is sensitive to initialization, scaling, and outliers. These limitations motivate the consideration of alternative partitioning methods.
+
+PD clustering, or partitioning approaches related to medoid-based clustering such as PAM, offer a more robust alternative by representing clusters through actual observations rather than arithmetic centroids. Because medoid-based methods are less influenced by extreme points, they may be better suited to latent spaces that contain irregular distributions or localized concentration patterns. Their principal disadvantage is that they are typically more computationally demanding than k-means, particularly as the sample size grows.
+
+Another important line of work addresses the interaction between clustering and dimension reduction. High-dimensional data often present serious challenges for clustering because distances can become less informative and noise can obscure genuine structure. Reduced k-means and related subspace clustering methods attempt to address this problem by simultaneously identifying a lower-dimensional representation of the data and a partition within that representation. These approaches are attractive in applications where the relevant clustering structure is believed to lie in a latent subspace rather than the full observed space.
+
+Factorial clustering methods extend this idea further by modeling cluster structure through latent factors. These approaches are particularly relevant when the observed variables are driven by a smaller number of hidden dimensions, as is often assumed in latent-feature models. In settings involving learned neural embeddings, factorial clustering can be a natural choice because it explicitly recognizes that the feature space may itself reflect an underlying factor structure.
+
+Representation learning provides another important component of this project. In recommender-system data, raw user-item matrices are sparse and high-dimensional, which makes direct clustering difficult. Neural models can instead learn dense embeddings that represent users or items in a continuous latent space. These embeddings are designed to capture patterns of similarity and interaction in a more compact and informative form. Once learned, such representations may yield clusterings that are more coherent and more interpretable than those obtained from the original sparse data.
+
+Cluster validation presents a distinct challenge because clustering is unsupervised. In the absence of class labels, evaluation typically relies on internal criteria such as silhouette score, within-cluster dispersion, or related compactness and separation measures. In addition, stability across repeated runs and substantive interpretability of the resulting groups are often important practical considerations. For this reason, the evaluation in this project will not depend on a single metric alone, but instead will consider multiple aspects of clustering quality.
+
+# Data {#sec-data}
+
+We use the MovieLens 1M dataset for this project, which is a publicly available stable benchmark that is used frequently for research. It contains approximately one million movie ratings collected from roughly six thousand users on roughly four thousand movies. Its moderate size makes it appropriate for experimentation with both neural embedding models and multiple clustering procedures while remaining computationally manageable.
+
+The principal files relevant to this analysis are the user ratings, movie metadata, and, if incorporated into the analysis, the user information file. The ratings data contain user identifiers, movie identifiers, numeric ratings, and timestamps. The movie metadata provide titles and genre labels, which are useful for interpretation of cluster structure after the clustering procedure has been completed. If user covariates are later included, the user information file may provide additional demographic context for describing the resulting clusters.
+
+The preprocessing stage is intended to transform the raw ratings data into a form suitable for representation learning and clustering. Because user-item data are typically sparse, it is often useful to filter out users with very few ratings and possibly movies with very low interaction frequency. Such filtering helps reduce noise and ensures that learned embeddings are based on sufficient interaction history. Depending on the final implementation, ratings may be retained in their original form, normalized, or converted into an implicit-feedback style interaction signal. The resulting processed data is then used to train the embedding model.
+
+At this stage of the report, the general preprocessing logic can be described, while the exact thresholds and final sample sizes should be inserted once the implementation is complete. Specifically, the final version of this section should report the filtering criteria applied to users and movies, the number of observations retained after preprocessing, and any normalization or transformation procedures used in constructing the model input. It would also be appropriate to include a brief summary of the sparsity of the final user-item matrix and, if relevant, descriptive statistics about ratings and genre frequencies.
+
+# Methods and Experimental Setup {#sec-methods}
+
+The overall methodology consists of two stages. In the first stage, dense latent representations are learned from the MovieLens 1M data using an MLP-based embedding model. In the second stage, multiple clustering procedures are applied to those learned embeddings in order to determine which combination of representation size and clustering algorithm yields the most meaningful grouping structure.
+
+The representation-learning component is based on an MLP framework that produces latent embeddings of dimension 64, 128, and 256. The purpose of considering multiple embedding sizes is to study how representation capacity affects cluster formation. Lower-dimensional embeddings may encourage more compact and generalizable structure, while higher-dimensional embeddings may capture more subtle patterns at the cost of increased complexity. By comparing clustering outcomes across these dimensions, the project evaluates whether richer representations necessarily improve cluster quality or whether more compact embeddings are sufficient.
+
+The exact neural architecture should be documented once the code implementation is finalized. In the completed version of the report, this subsection should specify the input representation, the number and size of hidden layers, activation functions, optimization method, learning rate, batch size, number of training epochs, regularization choices, and the loss function used to train the embeddings. If the model learns both user and item embeddings jointly, that should also be stated explicitly, together with an explanation of whether clustering is applied to user embeddings, item embeddings, or both.
+
+After the embeddings are learned, clustering is performed separately in each embedding space. The first clustering method considered is k-means, which provides a natural baseline because of its widespread use and computational efficiency. The second is PD clustering, which is intended to offer a more robust partitioning alternative. In addition, reduced k-means is included in order to study clustering when cluster structure is assumed to lie in a lower-dimensional subspace. Factorial PD clustering is also included to capture more complex latent-factor structure that may not be adequately represented by centroid-based methods alone.
+
+The full experimental design therefore consists of applying each clustering method to each embedding dimension. This produces a systematic comparison across representation size and clustering algorithm. The final report should present the number of clusters considered and explain the procedure used to select that value. For example, the number of clusters may be chosen based on internal validation criteria, elbow-style analyses, silhouette comparisons, or theoretical considerations motivated by the data. The completed report should also describe initialization strategies, stopping criteria, and the number of repeated runs used to reduce sensitivity to local minima or random starting conditions.
+
+A key conceptual contribution of this project is that the clustering is not performed directly on the raw sparse rating matrix, but rather on a learned latent representation of user–item interactions. This distinction is important because the embedding model is intended to transform sparse and noisy observed behavior into a more structured latent space in which cluster separation may become more apparent. Accordingly, the results of the project will help assess whether clustering in learned representation space provides an advantage over clustering in the original data space.
+
+# Test Setup and Evaluation {#sec-tests}
+Because this project is based on unsupervised learning, evaluation differs substantially from the test protocols commonly used in recommendation or classification tasks. There is no direct analogue of a labeled test set in the standard sense, and thus the quality of a clustering solution must be assessed through internal validation, stability, and interpretability. For that reason, the evaluation framework in this project is designed to compare clustering outcomes along several complementary dimensions.
+
+The first class of evaluation measures consists of internal validation metrics. These metrics quantify how compact the clusters are and how well separated they are from one another. One important metric is the silhouette score, which evaluates how similar each observation is to its own cluster relative to the nearest competing cluster. Higher silhouette values generally indicate stronger separation and better-defined grouping structure. Another useful criterion is within-cluster sum of squares, which measures the total variation of observations around their assigned centroids. Smaller values indicate tighter clustering, though they must be interpreted carefully since this quantity often decreases mechanically as the number of clusters increases. Additional indices such as the Davies–Bouldin index may also be used to provide a broader comparison of cluster compactness and separation.
+
+A second component of the evaluation concerns stability. Many clustering algorithms, especially partition-based ones, are sensitive to random initialization or local optima. For this reason, each clustering configuration should ideally be run multiple times, and the consistency of the resulting partitions should be assessed. Stability can be measured by comparing repeated solutions using indices such as adjusted Rand similarity or related agreement measures. A clustering method that produces highly variable results across repeated runs may be less reliable even if its internal metrics appear favorable in a single instance.
+
+A third component of the evaluation is interpretability. Since the MovieLens dataset includes movie genres and potentially user covariates, the resulting clusters can be examined substantively to determine whether they correspond to meaningful viewing patterns. For example, item clusters may be associated with dominant genres or combinations of genres, while user clusters may reflect distinct preference profiles or rating behaviors. This interpretive analysis is important because a mathematically compact clustering is not necessarily a substantively meaningful one.
+
+The final report should present the evaluation framework in a reproducible way by clearly stating which metrics were used, how many repeated runs were performed, and how the best overall method was selected. If dimensionality-reduction visualizations such as PCA or t-SNE are later included for illustration, they can be discussed as qualitative support for the quantitative findings, though they should not be treated as primary evidence on their own.
+
+# Results {#sec-results}
+Structure:
+
+1. Effect of Embedding Size Compare 64 vs 128 vs 256
+
+2. Algorithm Comparison k-means vs PD vs reduced vs factorial
+
+3. Best Model Selection Based on validation metrics
+
+ADD LATER (IMPORTANT):
+
+All numeric results
+
+Tables + plots
+
+Observations (e.g., “higher dimension improves separation but increases variance”)
+
+
+# Conclusion and Future Work {#sec-conc}
+
+In this project, we study the use of learned neural embeddings as a basis for clustering analysis on the MovieLens 1M dataset. Rather than approaching the dataset as a prediction problem, the project treats it as a source of latent structural information and asks whether meaningful groups of users or items can be identified through clustering in embedding space. By comparing MLP embeddings of dimension 64, 128, and 256 and applying multiple clustering procedures to each representation, the project is designed to evaluate how representation size and clustering method jointly affect the quality of unsupervised structure discovery.
+
+Even before the final numerical results are obtained, the methodological value of the study is clear. The project integrates several themes from clustering analysis, including partition-based clustering, dimension reduction, latent-factor methods, and cluster validation, within a modern representation-learning framework. It therefore provides a useful bridge between classical clustering methodology and neural latent-feature modeling.
+
+The completed analysis will determine which clustering procedure performs best on the learned embeddings and whether higher-dimensional representations produce more meaningful groups. It will also provide insight into whether more sophisticated methods such as reduced k-means or factorial PD clustering yield advantages over simpler baseline approaches such as k-means. These findings may have broader implications for how clustering is used in recommendation-related datasets, especially when interpretability and exploratory structure discovery are the primary goals.
+
+There are several natural directions for future work. One extension would be to incorporate additional clustering methods covered in the course, such as spectral clustering, fuzzy clustering, model-based mixture methods, or clustering with covariates. Another would be to include user demographic information or richer movie metadata in order to study clustering with mixed or augmented feature spaces. A further extension would be to compare MLP-based embeddings with embeddings learned through alternative architectures such as autoencoders or other neural latent-variable models. Finally, it would be valuable to examine whether the clusters discovered in this project can be used in downstream tasks, such as improving recommendation quality, explaining user preferences, or supporting market segmentation analyses.
+
