@@ -1,0 +1,119 @@
+---
+title: "MovieLens 1M: Clustering the Embeddings"
+author: "OpenAI"
+date: "`r format(Sys.Date())`"
+output:
+  pdf_document:
+    toc: true
+    number_sections: true
+fontsize: 11pt
+geometry: margin=1in
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  warning = FALSE,
+  message = FALSE,
+  fig.width = 9,
+  fig.height = 6,
+  dpi = 120
+)
+set.seed(42)
+```
+
+# Overview
+
+
+# Requirements
+
+
+```{r libraries}
+required_packages <- c(
+  "readr", "dplyr", "tidyr", "ggplot2",
+  "cluster", "factoextra",
+  "FPDclustering"
+)
+
+installed <- rownames(installed.packages())
+missing_pkgs <- setdiff(required_packages, installed)
+if (length(missing_pkgs) > 0) {
+  install.packages(missing_pkgs)
+}
+
+library(reader)
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(cluster)
+library(factoextra)
+library(clustertend)
+library(FPDclustering)
+```
+
+# 1. Load embeddings files
+
+```{r download-and-read}
+# Change to whichever embedding size you want
+embedding_path <- "output/embeddings/user_embeddings_128.csv"
+embeddings <- readr::read_csv(embedding_path)
+user_ids <- embeddings[[1]]          # Save user IDs
+embedding_matrix <- embeddings[, -1] # Remove UserID column
+
+embedding_matrix <- as.matrix(embedding_matrix)
+
+#embedding_scaled <- scale(embedding_matrix)
+```
+
+# 2. Choose Number of Clusters
+
+```{r choose}
+wss <- numeric(10)
+
+for (k in 1:10) {
+  wss[k] <- kmeans(embedding_matrix, centers = k, nstart = 20)$tot.withinss
+}
+
+plot(1:10, wss, type="b", pch=19,
+     xlab="Number of Clusters",
+     ylab="Total Within-Cluster SS")
+```
+
+# 3. Apply k-means
+
+```{r kmeans}
+set.seed(123)
+
+k <- 5
+kmeans_result <- kmeans(
+  embedding_matrix,
+  centers = k,
+  nstart = 25
+)
+
+#print(kmeans_result)
+cluster_df <- data.frame(
+  UserID = user_ids,
+  Cluster = kmeans_result$cluster
+)
+
+head(cluster_df)
+```
+
+# 4. Visualize with PCA
+
+
+```{r pca-visual}
+pca <- prcomp(embedding_matrix)
+
+pca_df <- data.frame(
+  PC1 = pca$x[,1],
+  PC2 = pca$x[,2],
+  Cluster = as.factor(kmeans_result$cluster)
+)
+
+ggplot(pca_df, aes(x=PC1, y=PC2, color=Cluster)) +
+  geom_point(alpha=0.6) +
+  theme_minimal() +
+  ggtitle("K-Means Clusters (PCA Projection)")
+```
