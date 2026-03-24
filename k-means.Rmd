@@ -79,6 +79,12 @@ plot(1:10, wss, type="b", pch=19,
      ylab="Total Within-Cluster SS")
 ```
 
+
+# 2a. Choose larger number of clusters (from office hours discussion)
+```{r}
+fviz_nbclust(embedding_matrix, kmeans, method = "wss", k.max = 20)
+```
+
 # 3. Apply k-means
 
 ```{r kmeans}

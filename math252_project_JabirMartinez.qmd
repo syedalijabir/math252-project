@@ -1,9 +1,9 @@
 ---
-title: "TITLE"
-subtitle: "SUBTITLE"
+title: "Reel Insight (working title)"
+subtitle: "MovieLens 1M: Clustering the Embeddings"
 author: "Ali Jabir and Isis Martinez"
 thanks: "Project repository available at: [https://github.com/syedalijabir/math252-project](https://github.com/syedalijabir/math252-project)."
-date: "May XXX, 2025"
+date: "`r format(Sys.Date())`"
 format:
   pdf:
     number-sections: true
@@ -19,8 +19,6 @@ execute:
   body-footer: Math 252 - Cluster Analysis | Spring 2026 Project
 ---
 
-
-
 # Introduction {#sec-intro}
 Clustering is one of the central techniques in unsupervised learning and is widely used to uncover hidden structure in high-dimensional data. In contrast to supervised learning methods, which require labeled outcomes, clustering can partition observations into groups whose members are similar to one another and dissimilar to members of other groups. Because the true grouping structure is generally unknown in advance, clustering is especially useful for exploratory analysis, data summarization, segmentation, and downstream modeling.
 
@@ -30,7 +28,7 @@ The MovieLens datasets have long served as standard benchmarks in machine learni
 
 We plan to learn embeddings using an MLP-based model and then apply multiple clustering procedures to those embeddings. We will consider embedding dimensions of 64, 128, and 256. For each embedding space, we will apply several clustering methods, including k-means, PD clustering, reduced k-means, and factorial PD clustering. We will then compare the resulting clusterings to identify which approach best captures meaningful and stable structure in the data. In this way, the project brings together ideas from neural representation learning, partition-based clustering, dimension reduction, and cluster validation.
 
-This report is organized as follows. Section II provides background on clustering, latent representations, and the clustering methods most relevant to this study. Section III describes the MovieLens 1M dataset and the preprocessing steps used to prepare the data. Section IV outlines the methods and experimental design, including the learned embedding models and the clustering procedures applied to them. Section V presents the evaluation framework used to compare clustering solutions. Section VI is reserved for experimental results and their interpretation. Finally, Section VII concludes the report and discusses directions for future work.
+This report is organized as follows. @sec-back provides background on clustering, latent representations, and the clustering methods most relevant to this study. @sec-data describes the MovieLens 1M dataset and the preprocessing steps used to prepare the data. @sec-methods outlines the methods and experimental design, including the learned embedding models and the clustering procedures applied to them. @sec-tests presents the evaluation framework used to compare clustering solutions. @sec-results is reserved for experimental results and their interpretation. Finally, @sec-conc concludes the report and discusses directions for future work.
 
 # Background {#sec-back}
 Clustering methods attempt to divide observations into groups according to a notion of proximity or similarity. The definition of similarity is fundamental to the success of any clustering procedure, and in many settings it is determined by a distance function. Common distance measures include Euclidean distance, which is widely used in centroid-based methods such as k-means, and Mahalanobis distance, which accounts for covariance structure and can be more appropriate when variables are correlated or differently scaled. In high-dimensional applications, the choice of distance metric can substantially affect both the geometry of the data and the quality of the resulting clusters.
@@ -56,6 +54,129 @@ The principal files relevant to this analysis are the user ratings, movie metada
 The preprocessing stage is intended to transform the raw ratings data into a form suitable for representation learning and clustering. Because user-item data are typically sparse, it is often useful to filter out users with very few ratings and possibly movies with very low interaction frequency. Such filtering helps reduce noise and ensures that learned embeddings are based on sufficient interaction history. Depending on the final implementation, ratings may be retained in their original form, normalized, or converted into an implicit-feedback style interaction signal. The resulting processed data is then used to train the embedding model.
 
 At this stage of the report, the general preprocessing logic can be described, while the exact thresholds and final sample sizes should be inserted once the implementation is complete. Specifically, the final version of this section should report the filtering criteria applied to users and movies, the number of observations retained after preprocessing, and any normalization or transformation procedures used in constructing the model input. It would also be appropriate to include a brief summary of the sparsity of the final user-item matrix and, if relevant, descriptive statistics about ratings and genre frequencies.
+
+```{r libraries, include=FALSE}
+required_packages <- c(
+  "readr", "dplyr", "tidyr", "ggplot2",
+  "cluster", "factoextra", "clustertend",
+  "FPDclustering"
+)
+
+installed <- rownames(installed.packages())
+missing_pkgs <- setdiff(required_packages, installed)
+if (length(missing_pkgs) > 0) {
+  install.packages(missing_pkgs)
+}
+
+library(readr)
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(cluster)
+library(factoextra)
+library(clustertend)
+library(FPDclustering)
+```
+
+
+```{r download-read, include=FALSE}
+
+# 1. Load embeddings files
+# Embedding size 64 
+embedding_path_64 <- "output/embeddings/user_embeddings_64.csv"
+embeddings_64 <- readr::read_csv(embedding_path_64)
+user_ids <- embeddings_64[[1]]          # Save user IDs
+embedding_matrix_64 <- as.matrix(embeddings_64[, -1]) # Remove UserID column, save as matrix
+#embedding_scaled_64 <- scale(embedding_scaled_64)
+
+# Embedding size 128 
+embedding_path_128 <- "output/embeddings/user_embeddings_128.csv"
+embeddings_128 <- readr::read_csv(embedding_path_128)
+user_ids <- embeddings_128[[1]]          # Save user IDs
+embedding_matrix_128 <- as.matrix(embeddings_128[, -1]) # Remove UserID column, save as matrix
+#embedding_scaled_128 <- scale(embedding_scaled_128)
+
+# Embedding size 256
+embedding_path_256 <- "output/embeddings/user_embeddings_256.csv"
+embeddings_256 <- readr::read_csv(embedding_path_256)
+user_ids <- embeddings_256[[1]]          # Save user IDs
+embedding_matrix_256 <- as.matrix(embeddings_256[, -1]) # Remove UserID column, save as matrix
+#embedding_scaled_256 <- scale(embedding_scaled_256)
+```
+
+```{r choose}
+# 2. Choose Number of Clusters
+wss <- numeric(10)
+
+for (k in 1:10) {
+  wss[k] <- kmeans(embedding_matrix, centers = k, nstart = 20)$tot.withinss
+}
+
+plot(1:10, wss, type="b", pch=19,
+     xlab="Number of Clusters",
+     ylab="Total Within-Cluster SS")
+
+
+### Choosing larger number of clusters
+embedding_matrix <- embedding_matrix_64
+
+fviz_nbclust(embedding_matrix, kmeans, method = "wss", k.max = 20)
+
+
+####
+embedding_matrix <- embedding_matrix_64   # or _128 or _256
+
+max_k <- 20
+wss <- numeric(max_k)
+
+for (k in 1:max_k) {
+  wss[k] <- kmeans(embedding_matrix, centers = k, nstart = 20)$tot.withinss
+}
+
+plot(1:max_k, wss, type = "b", pch = 19,
+     xlab = "Number of Clusters",
+     ylab = "Total Within-Cluster SS")
+```
+
+# 3. Apply k-means
+
+```{r kmeans}
+set.seed(123)
+
+k <- 5
+kmeans_result <- kmeans(
+  embedding_matrix,
+  centers = k,
+  nstart = 25
+)
+
+#print(kmeans_result)
+cluster_df <- data.frame(
+  UserID = user_ids,
+  Cluster = kmeans_result$cluster
+)
+
+head(cluster_df)
+```
+
+# 4. Visualize with PCA
+
+
+```{r pca-visual}
+pca <- prcomp(embedding_matrix)
+
+pca_df <- data.frame(
+  PC1 = pca$x[,1],
+  PC2 = pca$x[,2],
+  Cluster = as.factor(kmeans_result$cluster)
+)
+
+ggplot(pca_df, aes(x=PC1, y=PC2, color=Cluster)) +
+  geom_point(alpha=0.6) +
+  theme_minimal() +
+  ggtitle("K-Means Clusters (PCA Projection)")
+```
+
 
 # Methods and Experimental Setup {#sec-methods}
 
