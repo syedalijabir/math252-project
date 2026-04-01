@@ -1,6 +1,6 @@
 ---
 title: "MovieLens 1M: Clustering the Embeddings"
-author: "OpenAI"
+author: ""
 date: "`r format(Sys.Date())`"
 output:
   pdf_document:
