@@ -70,11 +70,11 @@ embedding_matrix <- as.matrix(embedding_matrix)
 ```{r choose}
 wss <- numeric(10)
 
-for (k in 1:10) {
+for (k in 1:20) {
   wss[k] <- kmeans(embedding_matrix, centers = k, nstart = 20)$tot.withinss
 }
 
-plot(1:10, wss, type="b", pch=19,
+plot(1:20, wss, type="b", pch=19,
      xlab="Number of Clusters",
      ylab="Total Within-Cluster SS")
 ```
@@ -90,7 +90,7 @@ fviz_nbclust(embedding_matrix, kmeans, method = "wss", k.max = 20)
 ```{r kmeans}
 set.seed(123)
 
-k <- 5
+k <- 10
 kmeans_result <- kmeans(
   embedding_matrix,
   centers = k,
