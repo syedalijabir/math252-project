@@ -60,30 +60,44 @@ embeddings <- readr::read_csv(embedding_path)
 user_ids <- embeddings[[1]]          # Save user IDs
 embedding_matrix <- embeddings[, -1] # Remove UserID column
 
-embedding_matrix <- as.matrix(embedding_matrix)
-
-#embedding_scaled <- scale(embedding_matrix)
+# embedding_matrix <- as.matrix(embedding_matrix)
+# embedding_scaled <- scale(embedding_matrix)
+embedding_matrix <- scale(as.matrix(embedding_matrix))
 ```
 
 # 2. Choose Number of Clusters
 
-```{r choose}
-wss <- numeric(10)
+```{r choose-wss}
+# wss <- numeric(10)
+
+#for (k in 1:20) {
+#  wss[k] <- kmeans(embedding_matrix, centers = k, nstart = 20)$tot.withinss}
+
+# plot(1:20, wss, type="b", pch=19,
+#     xlab="Number of Clusters",
+#     ylab="Total Within-Cluster SS")
+
+
+wss <- numeric(20)
+sil_scores <- rep(NA, 20)
+
+dmat <- dist(embedding_matrix)
 
 for (k in 1:20) {
-  wss[k] <- kmeans(embedding_matrix, centers = k, nstart = 20)$tot.withinss
+  km <- kmeans(embedding_matrix, centers = k, nstart = 20)
+  
+  wss[k] <- km$tot.withinss
+  
+  if (k >= 2) {
+    sil <- silhouette(km$cluster, dmat)
+    sil_scores[k] <- mean(sil[, 3])
+  }
 }
 
-plot(1:20, wss, type="b", pch=19,
-     xlab="Number of Clusters",
-     ylab="Total Within-Cluster SS")
 ```
 
 
-# 2a. Choose larger number of clusters (from office hours discussion)
-```{r}
-fviz_nbclust(embedding_matrix, kmeans, method = "wss", k.max = 20)
-```
+
 
 # 3. Apply k-means
 

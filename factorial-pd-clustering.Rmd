@@ -1,0 +1,194 @@
+---
+title: "MovieLens 1M: Factorial PD Clustering on Embeddings"
+author: ""
+date: "`r format(Sys.Date())`"
+output:
+  pdf_document:
+    toc: true
+    number_sections: true
+fontsize: 11pt
+geometry: margin=1in
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  warning = FALSE,
+  message = FALSE,
+  fig.width = 9,
+  fig.height = 6,
+  dpi = 120
+)
+set.seed(42)
+```
+
+```{r}
+required_packages <- c(
+  "readr", "dplyr", "ggplot2",
+  "cluster", "factoextra", "FPDclustering"
+)
+
+installed <- rownames(installed.packages())
+missing_pkgs <- setdiff(required_packages, installed)
+
+if (length(missing_pkgs) > 0) {
+  install.packages(missing_pkgs)
+}
+
+library(readr)
+library(dplyr)
+library(ggplot2)
+library(cluster)
+library(factoextra)
+library(FPDclustering)
+```
+
+# 1. Load embeddings
+```{r}
+embedding_path <- "output/embeddings/user_embeddings_128.csv"
+
+embeddings <- read_csv(embedding_path)
+
+user_ids <- embeddings[[1]]
+embedding_matrix <- embeddings[, -1]
+
+embedding_matrix <- as.matrix(embedding_matrix)
+embedding_matrix <- scale(embedding_matrix)
+
+dim(embedding_matrix)
+head(user_ids)
+```
+
+# 2. Inspect possible factor dimensions
+```{r}
+TuckerFactors(embedding_matrix, 6)
+```
+
+# 3. Tune number of clusters and factor dimension 
+
+```{r}
+k_range <- 2:10
+q_range <- 2:6
+
+dmat <- dist(embedding_matrix)
+
+results_grid <- expand.grid(k = k_range, q = q_range)
+results_grid$asw <- NA
+
+fpdc_models <- vector("list", nrow(results_grid))
+
+for (i in seq_len(nrow(results_grid))) {
+  k_val <- results_grid$k[i]
+  q_val <- results_grid$q[i]
+  
+  cat("Running FPDC with k =", k_val, "and q =", q_val, "\n")
+  
+  model <- FPDC(
+    embedding_matrix,
+    k_val,
+    50,
+    q_val
+  )
+  
+  labels <- model$label
+  
+  sil <- silhouette(labels, dmat)
+  avg_sil <- mean(sil[, 3])
+  
+  results_grid$asw[i] <- avg_sil
+  fpdc_models[[i]] <- model
+}
+
+results_grid
+```
+
+# 4. Find best model
+```{r}
+best_index <- which.max(results_grid$asw)
+best_params <- results_grid[best_index, ]
+
+best_k <- best_params$k
+best_q <- best_params$q
+best_asw <- best_params$asw
+
+best_fpdc <- fpdc_models[[best_index]]
+
+best_params
+```
+
+# 5. Plot tuning results
+```{r}
+ggplot(results_grid, aes(x = q, y = asw, color = factor(k), group = k)) +
+  geom_line() +
+  geom_point(size = 2) +
+  theme_minimal() +
+  labs(
+    title = "Factorial PD Clustering Tuning Results",
+    x = "Factor Dimension (q)",
+    y = "Average Silhouette Width",
+    color = "Clusters (k)"
+  )
+```
+
+# 6. Cluster assignments
+```{r}
+cluster_df <- data.frame(
+  UserID = user_ids,
+  Cluster = best_fpdc$label
+)
+
+head(cluster_df)
+table(cluster_df$Cluster)
+```
+
+# 7. Silhouette plot for best solution
+```{r}
+best_sil <- silhouette(best_fpdc$label, dmat)
+
+plot(
+  best_sil,
+  main = paste("Factorial PD Clustering Silhouette Plot (k =", best_k, ", q =", best_q, ")"),
+  col = "blue",
+  border = NA
+)
+```
+
+# 8. PCA visualization
+```{r}
+pca <- prcomp(embedding_matrix)
+
+pca_df <- data.frame(
+  PC1 = pca$x[, 1],
+  PC2 = pca$x[, 2],
+  Cluster = as.factor(best_fpdc$label)
+)
+
+ggplot(pca_df, aes(x = PC1, y = PC2, color = Cluster)) +
+  geom_point(alpha = 0.6) +
+  theme_minimal() +
+  labs(
+    title = paste("Factorial PD Clustering (PCA Projection): k =", best_k, ", q =", best_q),
+    x = "PC1",
+    y = "PC2"
+  )
+```
+
+# 9. Probability-based silhouette
+```{r}
+Silh(best_fpdc$probability)
+```
+
+# 10. Save results
+```{r}
+write.csv(
+  cluster_df,
+  file = paste0("output/fpdc_clusters_k", best_k, "_q", best_q, ".csv"),
+  row.names = FALSE
+)
+
+write.csv(
+  results_grid,
+  file = "output/fpdc_tuning_results.csv",
+  row.names = FALSE
+)
+```

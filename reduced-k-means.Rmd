@@ -1,0 +1,180 @@
+---
+title: "MovieLens 1M: Reduced K-means Clustering the Embeddings"
+author: ""
+date: "`r format(Sys.Date())`"
+output:
+  pdf_document:
+    toc: true
+    number_sections: true
+fontsize: 11pt
+geometry: margin=1in
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  warning = FALSE,
+  message = FALSE,
+  fig.width = 9,
+  fig.height = 6,
+  dpi = 120
+)
+set.seed(42)
+```
+
+```{r}
+required_packages <- c(
+  "readr", "dplyr", "ggplot2",
+  "cluster", "factoextra", "clustrd"
+)
+
+installed <- rownames(installed.packages())
+missing_pkgs <- setdiff(required_packages, installed)
+
+if (length(missing_pkgs) > 0) {
+  install.packages(missing_pkgs)
+}
+
+library(readr)
+library(dplyr)
+library(ggplot2)
+library(cluster)
+library(factoextra)
+library(clustrd)
+
+```
+
+
+```{r}
+embedding_path <- "output/embeddings/user_embeddings_128.csv"
+
+embeddings <- read_csv(embedding_path)
+
+user_ids <- embeddings[[1]]
+embedding_matrix <- embeddings[, -1]
+
+embedding_matrix <- as.matrix(embedding_matrix)
+embedding_matrix <- scale(embedding_matrix)
+
+dim(embedding_matrix)
+head(user_ids)
+```
+
+```{r}
+k_range <- 2:10
+q_range <- 2:6
+
+dmat <- dist(embedding_matrix)
+
+results_grid <- expand.grid(k = k_range, q = q_range)
+results_grid$asw <- NA
+
+rkm_models <- vector("list", nrow(results_grid))
+
+for (i in seq_len(nrow(results_grid))) {
+  k_val <- results_grid$k[i]
+  q_val <- results_grid$q[i]
+  
+  cat("Running RKM with k =", k_val, "and q =", q_val, "\n")
+  
+  model <- cluspca(
+    embedding_matrix,
+    nclus = k_val,
+    ndim = q_val,
+    method = "RKM",
+    rotation = "varimax"
+  )
+  
+  sil <- silhouette(model$cluster, dmat)
+  avg_sil <- mean(sil[, 3])
+  
+  results_grid$asw[i] <- avg_sil
+  rkm_models[[i]] <- model
+}
+
+results_grid
+```
+
+```{r}
+best_index <- which.max(results_grid$asw)
+best_params <- results_grid[best_index, ]
+
+best_k <- best_params$k
+best_q <- best_params$q
+best_asw <- best_params$asw
+
+best_rkm <- rkm_models[[best_index]]
+
+best_params
+```
+
+```{r}
+ggplot(results_grid, aes(x = q, y = asw, color = factor(k), group = k)) +
+  geom_line() +
+  geom_point(size = 2) +
+  theme_minimal() +
+  labs(
+    title = "Reduced K-Means Tuning Results",
+    x = "Reduced Dimension (q)",
+    y = "Average Silhouette Width",
+    color = "Clusters (k)"
+  )
+```
+
+```{r}
+cluster_df <- data.frame(
+  UserID = user_ids,
+  Cluster = best_rkm$cluster
+)
+
+head(cluster_df)
+table(cluster_df$Cluster)
+```
+
+```{r}
+best_sil <- silhouette(best_rkm$cluster, dmat)
+
+plot(
+  best_sil,
+  main = paste("Reduced K-Means Silhouette Plot (k =", best_k, ", q =", best_q, ")"),
+  col = "blue",
+  border = NA
+)
+```
+
+```{r}
+pca <- prcomp(embedding_matrix)
+
+pca_df <- data.frame(
+  PC1 = pca$x[, 1],
+  PC2 = pca$x[, 2],
+  Cluster = as.factor(best_rkm$cluster)
+)
+
+ggplot(pca_df, aes(x = PC1, y = PC2, color = Cluster)) +
+  geom_point(alpha = 0.6) +
+  theme_minimal() +
+  labs(
+    title = paste("Reduced K-Means Clusters (PCA Projection): k =", best_k, ", q =", best_q),
+    x = "PC1",
+    y = "PC2"
+  )
+```
+
+```{r}
+best_rkm$centroid
+plot(best_rkm, cludesc = TRUE)
+```
+
+```{r}
+write.csv(
+  cluster_df,
+  file = paste0("output/rkm_clusters_k", best_k, "_q", best_q, ".csv"),
+  row.names = FALSE
+)
+
+write.csv(
+  results_grid,
+  file = "output/rkm_tuning_results.csv",
+  row.names = FALSE
+)
+```
