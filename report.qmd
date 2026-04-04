@@ -1,0 +1,64 @@
+---
+title: "Reel Insight (working title)"
+subtitle: "MovieLens 1M: Clustering the Embeddings"
+author: "Ali Jabir, Isis Martinez, Susan Peck"
+thanks: "Project repository available at: [https://github.com/syedalijabir/math252-project](https://github.com/syedalijabir/math252-project)."
+date: "`r format(Sys.Date())`"
+format:
+  pdf:
+    number-sections: true
+execute:
+  echo: true
+  warning: false
+  message: false
+  include: true
+  fig-width: 4    # default width (in inches)
+  fig-height: 3   # default height (in inches)
+  abstract: "xxx"
+  bibliography: references.bib
+  body-footer: Math 252 - Cluster Analysis | Spring 2026 Project
+---
+
+
+## CODE: To be moved as needed
+# Setup
+
+
+```{r setup}
+source("setup.R")
+```
+
+
+```{r kmeans}
+# Load saved k-means results
+kmeans_result <- readRDS("output/kmeans_result.rds")
+k_results_all <- readRDS("output/k_results_all.rds")
+k_results_mq <- readRDS("output/k_results_mq.rds")
+```
+
+```{r pd}
+# Load saved PD results
+pd_results <- readRDS("output/pd_results.rds")
+pd_pca_df <- readRDS("output/pd_pca_df.rds")
+```
+# PD METHODS
+The Within-Cluster Sum of Squares (WSS) was used for k-means clustering because it is directly tied to the algorithm’s objective function. However, WSS is not applicable to PD clustering, which does not optimize a centroid-based objective. Therefore, method-independent validation metrics such as silhouette score and Calinski–Harabasz index were used to evaluate and select the number of clusters for PD clustering.
+
+```{r}
+# Load saved interpretation outputs
+base_path <- "output/cluster_interpretations"
+
+rating_summary <- read_csv(file.path(base_path, "py_rating_summary.csv"), show_col_types = FALSE)
+activity_summary <- read_csv(file.path(base_path, "py_activity_summary.csv"), show_col_types = FALSE)
+top_genres <- read_csv(file.path(base_path, "py_top_genres.csv"), show_col_types = FALSE)
+demographic_summary <- read_csv(file.path(base_path, "py_demographic_summary.csv"), show_col_types = FALSE)
+cluster_profile <- read_csv(file.path(base_path, "py_cluster_profile.csv"), show_col_types = FALSE)
+```
+
+```{r}
+# K-means model selection
+print(k_results_mq)
+
+# Cluster profile
+print(cluster_profile)
+```

@@ -1,125 +1,22 @@
+####################### 1. SETUP #######################
+source("setup.R")
 
-####################### 1. REQUIRED PACKAGES/LIBRARIES  ####################### 
-required_packages <- c(
-  "readr",       # reading files 
-  "dplyr",       # data manipulation
-  "tidyr",       # splitting genres into rows
-  "ggplot2",     # plotting
-  "cluster",     # silhouette
-  "clusterCrit", # Calinski-Harabasz index
-  "factoextra",   # helper plots
-  "FPDclustering",
-  "hopkins", #############***
-)
-
-installed <- rownames(installed.packages())
-missing_pkgs <- setdiff(required_packages, installed)
-if (length(missing_pkgs) > 0) {
-  install.packages(missing_pkgs)
-}
-
-library(readr); library(dplyr); library(tidyr); library(ggplot2)
-library(cluster); library(clusterCrit); library(factoextra); 
-library(FPDclustering); library(hopkins)
-
-set.seed(42)
-
-
-####################### 2. Load embeddings files ####################### 
-
-embedding_path <- "output/embeddings/user_embeddings_128.csv"
-embeddings <- read_csv(embedding_path, show_col_types = FALSE)
-user_ids <- embeddings[[1]]          # Save user IDs, first column is UserID
-embedding_matrix <- embeddings[, -1] # Remove UserID column. Remaining columns are embedding features
-
-embedding_matrix <- scale(as.matrix(embedding_matrix)) # Convert to matrix and scale before clustering
-
-cat("Embedding matrix dimensions:", dim(embedding_matrix), "\n")
-
-
-####################### 4. CHOOSE NUMBER OF CLUSTERS #######################
-#* We evaluate k = 2 to 20 using:
-#* WSS (elbow method)
-#* average silhouette width
-#* Calinski-Harabasz (CH) index
-
-####################### 4. CHOOSE NUMBER OF CLUSTERS #######################
-# Evaluate k = 2 to 20 using:
-# - WSS (elbow method)
-# - average silhouette width
-# - Calinski-Harabasz (CH) index
-
-k_vals <- 2:20
-
-# Compute distance matrix once for silhouette
-dmat <- dist(embedding_matrix)
-
-# Function to evaluate one k-means algorithm across all k
-evaluate_kmeans <- function(x, k_vals, dmat, algorithm = "Hartigan-Wong",
-                            nstart = 10, iter.max = 100) {
-  
-  wss <- numeric(length(k_vals))
-  sil_scores <- numeric(length(k_vals))
-  ch_scores <- numeric(length(k_vals))
-  
-  for (i in seq_along(k_vals)) {
-    k <- k_vals[i]
-    
-    km <- kmeans(
-      x,
-      centers = k,
-      nstart = nstart,
-      iter.max = iter.max,
-      algorithm = algorithm
-    )
-    
-    wss[i] <- km$tot.withinss
-    
-    sil <- silhouette(km$cluster, dmat)
-    sil_scores[i] <- mean(sil[, 3])
-    
-    ch_scores[i] <- intCriteria(
-      traj = as.matrix(x),
-      part = as.integer(km$cluster),
-      crit = "Calinski_Harabasz"
-    )$calinski_harabasz
-  }
-  
-  data.frame(
-    Algorithm = algorithm,
-    k = k_vals,
-    WSS = wss,
-    Silhouette = sil_scores,
-    CH = ch_scores
-  )
-}
-
+####################### 2. CHOOSE NUMBER OF CLUSTERS ####################### 
 # Run all three algorithms
-k_results_hw <- evaluate_kmeans(x = embedding_matrix, k_vals = k_vals,
-                                dmat = dmat, algorithm = "Hartigan-Wong"
-)
+k_results_hw <- evaluate_kmeans(embedding_matrix, k_vals, dmat, "Hartigan-Wong")
+k_results_lloyd <- evaluate_kmeans(embedding_matrix, k_vals, dmat, "Lloyd")
+k_results_mq <- evaluate_kmeans(embedding_matrix, k_vals, dmat, "MacQueen")
 
-k_results_lloyd <- evaluate_kmeans(x = embedding_matrix, k_vals = k_vals,
-                                   dmat = dmat, algorithm = "Lloyd"
-)
-
-k_results_mq <- evaluate_kmeans(x = embedding_matrix, k_vals = k_vals, 
-                                dmat = dmat, algorithm = "MacQueen"
-)
-
-# Combine all results into one table
+# Combine results into one table
 k_results_all <- dplyr::bind_rows(k_results_hw, k_results_lloyd, k_results_mq)
 
-# print combined results
-print(k_results_all)
-
-
-#### Comparison Table
+# Comparison Table for all results (wide to be easier to compare)
 k_results_wide <- k_results_all %>% 
   pivot_wider(names_from = Algorithm, values_from = c(WSS, Silhouette, CH))
 
 print(k_results_wide)
 
+################### ADD TO REPORT ##########################
 #* What each algorithm means:
 #* 1. Hartigan–Wong (default) -- most theoretically refined
 #* got Quick-Transfer warnings & struggles with this data --> not ideal here
@@ -130,10 +27,9 @@ print(k_results_wide)
 #* Results: no warnings + consistent results
 #* Best behavior for this data
 
-#* INTERPRETATION
+#* INTERPRETATION FOR REPORT
 #* Multiple k-means algorithms (Hartigan–Wong, Lloyd, and MacQueen) were evaluated to assess robustness. All algorithms produced consistent results, with k = 2 identified as the optimal number of clusters based on silhouette and Calinski–Harabasz indices. However, the Hartigan–Wong algorithm produced convergence warnings, and the Lloyd algorithm required additional iterations. The MacQueen algorithm exhibited stable behavior without convergence issues, and therefore was used for final clustering results.
-
-###########################################################
+#* The consistency of results across algorithms suggests that the observed clustering structure is inherent to the data rather than dependent on the optimization procedure.
 
 #* What each column is telling us:
 #* WSS (Within-Cluster Sum of Squares) -->Decreases as k increases (expected)
@@ -161,63 +57,32 @@ print(k_results_wide)
 #* Although k = 5 yields a positive silhouette score (0.13), it is substantially lower than the value at k = 2 (0.33), indicating weaker cluster separation. Additionally, the Calinski–Harabasz index decreases significantly as k increases. This suggests that increasing the number of clusters introduces artificial fragmentation rather than meaningful structure. Therefore, k = 2 is selected as the optimal number of clusters.
 #* When k = 10, the resulting clusters are highly imbalanced, with two dominant clusters containing over 1700 users each, while several clusters contain fewer than 200 users. This imbalance suggests that the algorithm is artificially subdividing a smaller number of underlying groups. This observation is consistent with the silhouette analysis, which indicated that k = 2 provides the best clustering structure. Larger values of k introduce unstable and weakly defined clusters.
 #* The presence of a few large clusters alongside several very small clusters indicates that the underlying data structure is not well-separated into many groups. Instead, the data appears to exhibit a coarse partitioning into a small number of dominant behavioral patterns.
-
-####################### 5. PLOT K-SELECTION METRICS #######################
-# Comparison plots
-ggplot(k_results_all, aes(x = k, y = Silhouette, color = Algorithm)) +
-  geom_line() + geom_point() + theme_minimal() + 
-  labs(title = "Silhouette by k and k-means algorithm")
-
-ggplot(k_results_all, aes(x = k, y = CH, color = Algorithm)) +
-  geom_line() + geom_point() + theme_minimal() +
-  labs(title = "Calinski-Harabasz by k and k-means algorithm")
-
-ggplot(k_results_all, aes(x = k, y = WSS, color = Algorithm)) +
-  geom_line() + geom_point() + theme_minimal() +
-  labs(title = "WSS by k and k-means algorithm")
-
-# JUST MCQUEEN
-print(k_results_mq)
-
-
-ggplot(k_results_mq, aes(x = k, y = Silhouette, color = Algorithm)) +
-  geom_line() + geom_point() + theme_minimal() + 
-  labs(title = "Silhouette by k and k-means algorithm")
-
-ggplot(k_results_mq, aes(x = k, y = CH, color = Algorithm)) +
-  geom_line() + geom_point() + theme_minimal() +
-  labs(title = "Calinski-Harabasz by k and k-means algorithm")
-
-ggplot(k_results_mq, aes(x = k, y = WSS, color = Algorithm)) +
-  geom_line() + geom_point() + theme_minimal() +
-  labs(title = "WSS by k and k-means algorithm")
+###############################################
 
 ####################### 6. SELECT FINAL K #######################
+#* Choose final k from MacQueen results -- Show all algorithms agree --> Emphasize robustness, not superiority
 
 #* choose k using silhouette as primary criterion
 #* use CH as confirmation
 #* check cluster size balance before finalizing
 #* set k manually after inspecting results.
 
-best_k_sil <- k_vals[which.max(sil_scores)]
-best_k_ch <- k_vals[which.max(ch_scores)]
+# Choose final k from MacQueen results
+best_k_sil <- k_results_mq$k[which.max(k_results_mq$Silhouette)]
+best_k_ch  <- k_results_mq$k[which.max(k_results_mq$CH)]
 
-cat("Best k by silhouette:", best_k_sil, "\n")
-cat("Best k by CH:", best_k_ch, "\n")
+cat("Best k by silhouette:", best_k_sil, "\n", "Best k by CH:", best_k_ch, "\n")
 
-# Set final k here after reviewing plots and metrics.
-# From results, k = 2 looked strongest.
-final_k <- 2
-
+final_k <- best_k_sil
 
 ####################### 7. FIT FINAL K-MEANS MODEL #######################
-
 set.seed(123)
 
 kmeans_result <- kmeans(
   embedding_matrix,
   centers = final_k,
   nstart = 100, 
+  iter.max = 100,
   algorithm = "MacQueen"
 )
 
@@ -227,158 +92,37 @@ cluster_df <- data.frame(
   Cluster = kmeans_result$cluster
 )
 
-head(cluster_df)
+# Check cluster sizes 
+table(kmeans_result$cluster)
 
 
-####################### 8. CHECK CLUSTER SIZES #######################
+####################### 11. SAVE RESULTS #######################
+dir.create("output", showWarnings = FALSE)
+dir.create("output/embeddings", recursive = TRUE, showWarnings = FALSE)
 
-cat("Cluster sizes for k =", final_k, "\n")
-print(table(kmeans_result$cluster))
+write.csv(cluster_df, "output/kmeans_cluster_assignments.csv", row.names = FALSE)
+write.csv(k_results_all, "output/kmeans_k_selection_metrics_all.csv", row.names = FALSE)
+write.csv(k_results_mq, "output/kmeans_k_selection_metrics_macqueen.csv", row.names = FALSE)
+write.csv(rating_summary, "output/kmeans_rating_summary.csv", row.names = FALSE)
+write.csv(activity_summary, "output/kmeans_activity_summary.csv", row.names = FALSE)
+write.csv(genre_summary, "output/kmeans_genre_summary.csv", row.names = FALSE)
 
-
-####################### 9. FINAL SILHOUETTE SCORE #######################
-
-final_sil <- silhouette(kmeans_result$cluster, dmat)
-final_avg_sil <- mean(final_sil[, 3])
-
-cat("Final average silhouette width:", final_avg_sil, "\n")
-
-# Silhouette plot
-plot(
-  final_sil,
-  main = paste("Silhouette Plot for k =", final_k),
-  col = "blue",
-  border = NA
-)
+saveRDS(kmeans_result, "output/kmeans_result.rds")
+saveRDS(k_results_all, "output/k_results_all.rds")
+saveRDS(k_results_mq, "output/k_results_mq.rds")
 
 
-####################### 10. PCA VISUALIZATION #######################
-# This is just for visualization, not for fitting k-means.
-
-pca <- prcomp(embedding_matrix)
-
-var_explained <- summary(pca)$importance[2, 1:2]
-
-pca_df <- data.frame(
-  PC1 = pca$x[, 1],
-  PC2 = pca$x[, 2],
-  Cluster = as.factor(kmeans_result$cluster)
-)
-
-ggplot(pca_df, aes(x = PC1, y = PC2, color = Cluster)) +
-  geom_point(alpha = 0.6) +
+####################### 14. PLOT TOP GENRES #######################
+ggplot(top_genres, aes(x = reorder(Genres, prop), y = prop, fill = as.factor(Cluster))) +
+  geom_col(show.legend = FALSE) +
+  coord_flip() +
+  facet_wrap(~ Cluster, scales = "free_y") +
   theme_minimal() +
   labs(
-    title = paste("K-Means Clusters (PCA Projection), k =", final_k),
-    x = paste0("PC1 (", round(100 * var_explained[1], 1), "%)"),
-    y = paste0("PC2 (", round(100 * var_explained[2], 1), "%)")
+    title = "Top 5 Genres by Cluster",
+    x = "Genre",
+    y = "Proportion within Cluster"
   )
-
-
-####################### 11. LOAD ORIGINAL RATINGS DATA #######################
-# Interpret what the clusters mean.
-
-# Bring back original ratings data
-ratings <- read_delim(
-  "C:/Users/terra/Documents/Schoolwork/SP26_Math252/252_project/data/ml-1m/ratings.dat",
-  delim = "::",
-  col_names = c("UserID", "MovieID", "Rating", "Timestamp"),
-  show_col_types = FALSE
-)
-
-merged <- ratings %>%
-  inner_join(cluster_df, by = "UserID")
-
-movies <- read_delim(
-  "C:/Users/terra/Documents/Schoolwork/SP26_Math252/252_project/data/ml-1m/ratings.dat",
-  delim = "::",
-  col_names = c("MovieID", "Title", "Genres"),
-  show_col_types = FALSE
-)
-merged_movies <- merged %>%
-  inner_join(movies, by = "MovieID")
-
-
-####################### 12. MERGE RATINGS WITH CLUSTERS #######################
-
-merged <- ratings %>%
-  inner_join(cluster_df, by = "UserID")
-
-head(merged)
-
-
-####################### 13. INTERPRETATION: AVERAGE RATING BEHAVIOR #######################
-# Compare average rating levels and total ratings by cluster
-
-rating_summary <- merged %>%
-  group_by(Cluster) %>%
-  summarise(
-    avg_rating = mean(Rating),
-    sd_rating = sd(Rating),
-    n_ratings = n(),
-    .groups = "drop"
-  )
-#* this tells us: Do users in one cluster rate higher/lower?  Are they more consistent?
-
-print(rating_summary)
-
-
-####################### 14. INTERPRETATION: USER ACTIVITY #######################
-# How many ratings per user in each cluster?
-
-user_activity <- merged %>%
-  group_by(UserID, Cluster) %>%
-  summarise(
-    num_ratings = n(),
-    .groups = "drop"
-  )
-
-activity_summary <- user_activity %>%
-  group_by(Cluster) %>%
-  summarise(
-    avg_ratings_per_user = mean(num_ratings),
-    median_ratings_per_user = median(num_ratings),
-    min_ratings_per_user = min(num_ratings),
-    max_ratings_per_user = max(num_ratings),
-    .groups = "drop"
-  )
-
-print(activity_summary)
-
-
-####################### 15. INTERPRETATION: GENRE PREFERENCES #######################
-# Merge in movie genres and summarize top genres by cluster
-
-merged_movies <- merged %>%
-  inner_join(movies, by = "MovieID")
-
-# Split genre strings like "Action|Adventure|Sci-Fi" into separate rows
-genre_data <- merged_movies %>%
-  separate_rows(Genres, sep = "\\|")
-
-genre_summary <- genre_data %>%
-  group_by(Cluster, Genres) %>%
-  summarise(
-    count = n(),
-    .groups = "drop"
-  ) %>%
-  group_by(Cluster) %>%
-  mutate(
-    prop = count / sum(count)
-  ) %>%
-  arrange(Cluster, desc(prop))
-
-print(genre_summary)
-
-# Top 5 genres per cluster
-top_genres <- genre_summary %>%
-  group_by(Cluster) %>%
-  slice_head(n = 5)
-
-print(top_genres)
-
-
-####################### 16. PLOT GENRE PREFERENCES #######################
 
 ggplot(top_genres, aes(x = reorder(Genres, prop), y = prop, fill = as.factor(Cluster))) +
   geom_col(position = "dodge") +
@@ -392,15 +136,5 @@ ggplot(top_genres, aes(x = reorder(Genres, prop), y = prop, fill = as.factor(Clu
   )
 
 
-####################### 17. SAVE RESULTS #######################
-
-write.csv(cluster_df, "output/kmeans_cluster_assignments.csv", row.names = FALSE)
-write.csv(k_results, "output/kmeans_k_selection_metrics.csv", row.names = FALSE)
-write.csv(rating_summary, "output/kmeans_rating_summary.csv", row.names = FALSE)
-write.csv(activity_summary, "output/kmeans_activity_summary.csv", row.names = FALSE)
-write.csv(genre_summary, "output/kmeans_genre_summary.csv", row.names = FALSE)
-
-
 ####################### NOTES FOR REPORTS #######################
-#
 # "The k-means results with k = 2 suggest that the embedding space contains one dominant user group and one smaller but distinct subgroup. The larger cluster represents the majority of users with more typical rating behavior, while the smaller cluster appears to capture users with distinct engagement patterns, rating tendencies, or genre preferences. Differences in activity level, average ratings, and genre proportions can be used to characterize the behavioral meaning of the two groups."

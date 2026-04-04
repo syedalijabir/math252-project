@@ -1,45 +1,13 @@
+####################### 1. SETUP #######################
+source("setup.R")
 
-# Requirements
+####################### 2. CHOOSE NUMBER OF CLUSTERS ####################### 
 
-required_packages <- c(
-  "readr", "dplyr", "tidyr", "ggplot2",
-  "cluster", "factoextra",
-  "FPDclustering"
-)
+results <- vector("list", length = max(k_vals))
+avg_silhouette <- rep(NA, max(k_vals))
+ch_scores <- rep(NA, max(k_vals))
 
-installed <- rownames(installed.packages())
-missing_pkgs <- setdiff(required_packages, installed)
-if (length(missing_pkgs) > 0) {
-  install.packages(missing_pkgs)
-}
-
-library(readr)
-library(dplyr)
-library(tidyr)
-library(ggplot2)
-library(cluster)
-library(factoextra)
-library(clustertend)
-library(FPDclustering)
-
-# 1. Load embeddings files
-
-# Change to whichever embedding size you want
-embedding_path <- "output/embeddings/user_embeddings_128.csv"
-embeddings <- readr::read_csv(embedding_path)
-user_ids <- embeddings[[1]]          # Save user IDs
-embedding_matrix <- embeddings[, -1] # Remove UserID column
-
-embedding_matrix <- as.matrix(embedding_matrix)
-
-
-
-# 2. Choose Number of Clusters
-
-results <- list()
-avg_silhouette <- numeric()
-
-for (k in 2:20) {
+for (k in k_vals) {
   cat("Running PDC for k =", k, "\n")
   
   # Run PD Clustering
@@ -48,96 +16,130 @@ for (k in 2:20) {
   # Extract labels
   labels <- pdc_model$label
   
-  # Compute distance matrix
-  d <- dist(embedding_matrix)
-  
   # Compute silhouette
-  sil <- silhouette(labels, d)
-  
-  #Silh(pdc_model$probability)
+  sil <- silhouette(labels, dmat) # distance matrix was computed in setup as dmat
   
   # Store average silhouette width
   avg_sil <- mean(sil[, 3])
   avg_silhouette[k] <- avg_sil
   
+  ch_scores[k] <- intCriteria(
+    traj = as.matrix(embedding_matrix),
+    part = as.integer(labels),
+    crit = "Calinski_Harabasz"
+  )$calinski_harabasz
+  
   # Save everything
   results[[k]] <- list(
     model = pdc_model,
+    labels = labels,
     silhouette = sil,
-    avg_silhouette = avg_sil
+    avg_silhouette = avg_sil,
+    ch = ch_scores[k]
   )
   
   cat("Avg silhouette for k =", k, ":", avg_sil, "\n\n")
 }
 
-# 2a. Plot Silhouette
-ks <- 2:20
-plot(ks, avg_silhouette[ks],
+####################### 3. RESULTS TABLE #######################
+
+pd_results <- data.frame(
+  Method = "PD",
+  k = k_vals,
+  Silhouette = avg_silhouette[k_vals],
+  CH = ch_scores[k_vals]
+)
+
+print(pd_results)
+
+
+
+####################### 4. PLOT MODEL SELECTION #######################
+plot(k_vals, avg_silhouette[k_vals],
      type = "b",
      pch = 19,
      col = "blue",
-     xlab = "Number of Clusters (K)",
+     xlab = "Number of Clusters (k)",
      ylab = "Average Silhouette Width",
      main = "PD-Clustering Model Selection")
 
 
-# 2b. Plot Silhouettes
-par(mfrow = c(4, 5), mar = c(2, 2, 2, 1))
+####################### 5. CHOOSE BEST K #######################
+best_k <- k_vals[which.max(avg_silhouette[k_vals])]
+cat("Best k based on silhouette:", best_k, "\n")
 
-for (k in 2:20) {
-  sil <- results[[k]]$silhouette
-  
-  plot(sil,
-       main = paste("K =", k),
-       col = "blue",
-       border = NA)
-}
+####################### 6. INSPECT BEST SOLUTION #######################
 
-# Reset layout
-par(mfrow = c(1,1))
+best_model <- results[[best_k]]$model
+best_labels <- results[[best_k]]$labels
+best_sil <- results[[best_k]]$silhouette
+final_avg_sil <- results[[best_k]]$avg_silhouette
 
-
-# 3. Choose best PD clustering
-
-set.seed(123)
-
-best_k <- 4 #which.max(avg_silhouette)
-
-plot(results[[best_k]]$silhouette,
-     main = paste("Silhouette Plot for K =", best_k),
-     col = "blue",
-     border = NA)
-
-
-# 4. Visualize with PCA
-pca <- prcomp(embedding_matrix)
-
-pca_df <- data.frame(
-  PC1 = pca$x[,1],
-  PC2 = pca$x[,2],
-  Cluster = as.factor(results[[best_k]]$model$label)
+# Silhouette plot
+plot(
+  best_sil,
+  main = paste("PD Clustering Silhouette Plot for k =", best_k),
+  col = "blue",
+  border = NA
 )
 
-ggplot(pca_df, aes(x=PC1, y=PC2, color=Cluster)) +
-  geom_point(alpha=0.6) +
-  theme_minimal() +
-  ggtitle("K-Means Clusters (PCA Projection)")
+# Cluster sizes
+cat("Cluster sizes for best k =", best_k, "\n")
+print(table(best_labels))
 
-ggplot(pca_df[pca_df$Cluster == 1, ], 
-       aes(x = PC1, y = PC2, color = Cluster)) +
+# PD-specific probability silhouette
+Silh(best_model$probability)
+
+
+####################### 7. FINAL CLUSTER ASSIGNMENTS #######################
+cluster_df <- data.frame(UserID = user_ids, Cluster = best_labels)
+
+head(cluster_df)
+
+####################### 8. PCA VISUALIZATION #######################
+
+pca <- prcomp(embedding_matrix)
+var_explained <- summary(pca)$importance[2, 1:2]
+
+pca_df <- data.frame(
+  PC1 = pca$x[, 1],
+  PC2 = pca$x[, 2],
+  Cluster = as.factor(best_labels)
+)
+
+ggplot(pca_df, aes(x = PC1, y = PC2, color = Cluster)) +
   geom_point(alpha = 0.6) +
   theme_minimal() +
-  ggtitle("Cluster 1 (PCA Projection)")
+  labs(
+    title = paste("PD Clustering (PCA Projection), k =", best_k),
+    x = paste0("PC1 (", round(100 * var_explained[1], 1), "%)"),
+    y = paste0("PC2 (", round(100 * var_explained[2], 1), "%)")
+  )
 
-ggplot(pca_df[pca_df$Cluster == 2, ], 
-       aes(x = PC1, y = PC2, color = Cluster)) +
-  geom_point(alpha = 0.6) +
-  theme_minimal() +
-  ggtitle("Cluster 1 (PCA Projection)")
+#### CLUSTER-SPECIFIC PCA PLOTS ####
+for (cl in levels(pca_df$Cluster)) {
+  print(
+    ggplot(subset(pca_df, Cluster == cl), aes(x = PC1, y = PC2, color = Cluster)) +
+      geom_point(alpha = 0.6) +
+      theme_minimal() +
+      ggtitle(paste("PD Cluster", cl, "(PCA Projection)"))
+  )
+}
 
-ggplot(pca_df[pca_df$Cluster == 3, ], 
-       aes(x = PC1, y = PC2, color = Cluster)) +
-  geom_point(alpha = 0.6) +
-  theme_minimal() +
-  ggtitle("Cluster 1 (PCA Projection)")
+labs(
+  title = paste("PD Clustering (PCA Projection), k =", best_k),
+  x = paste0("PC1 (", round(100 * var_explained[1], 1), "%)"),
+  y = paste0("PC2 (", round(100 * var_explained[2], 1), "%)")
+)
+
+####################### 9. SAVE RESULTS #######################
+dir.create("output", showWarnings = FALSE)
+
+write.csv(cluster_df, "output/pd_cluster_assignments.csv", row.names = FALSE)
+write.csv(pd_results, "output/pd_k_selection_metrics.csv", row.names = FALSE)
+
+saveRDS(best_model, "output/pd_best_model.rds")
+saveRDS(pd_results, "output/pd_results.rds")
+saveRDS(cluster_df, "output/pd_cluster_df.rds")
+saveRDS(pca_df, "output/pd_pca_df.rds")
 

@@ -8,7 +8,7 @@ format:
   pdf:
     number-sections: true
 execute:
-  echo: false
+  echo: true
   warning: false
   message: false
   include: true
@@ -18,6 +18,14 @@ execute:
   bibliography: references.bib
   body-footer: Math 252 - Cluster Analysis | Spring 2026 Project
 ---
+
+
+## CODE: To be moved as needed
+# Setup
+
+```{r}
+source("setup.R")
+```
 
 # Introduction {#sec-intro}
 Clustering is one of the central techniques in unsupervised learning and is widely used to uncover hidden structure in high-dimensional data. In contrast to supervised learning methods, which require labeled outcomes, clustering can partition observations into groups whose members are similar to one another and dissimilar to members of other groups. Because the true grouping structure is generally unknown in advance, clustering is especially useful for exploratory analysis, data summarization, segmentation, and downstream modeling.
@@ -55,127 +63,6 @@ The preprocessing stage is intended to transform the raw ratings data into a for
 
 At this stage of the report, the general preprocessing logic can be described, while the exact thresholds and final sample sizes should be inserted once the implementation is complete. Specifically, the final version of this section should report the filtering criteria applied to users and movies, the number of observations retained after preprocessing, and any normalization or transformation procedures used in constructing the model input. It would also be appropriate to include a brief summary of the sparsity of the final user-item matrix and, if relevant, descriptive statistics about ratings and genre frequencies.
 
-```{r libraries, include=FALSE}
-required_packages <- c(
-  "readr", "dplyr", "tidyr", "ggplot2",
-  "cluster", "factoextra", "clustertend",
-  "FPDclustering"
-)
-
-installed <- rownames(installed.packages())
-missing_pkgs <- setdiff(required_packages, installed)
-if (length(missing_pkgs) > 0) {
-  install.packages(missing_pkgs)
-}
-
-library(readr)
-library(dplyr)
-library(tidyr)
-library(ggplot2)
-library(cluster)
-library(factoextra)
-library(clustertend)
-library(FPDclustering)
-```
-
-
-```{r download-read, include=FALSE}
-
-# 1. Load embeddings files
-# Embedding size 64 
-embedding_path_64 <- "output/embeddings/user_embeddings_64.csv"
-embeddings_64 <- readr::read_csv(embedding_path_64)
-user_ids <- embeddings_64[[1]]          # Save user IDs
-embedding_matrix_64 <- as.matrix(embeddings_64[, -1]) # Remove UserID column, save as matrix
-#embedding_scaled_64 <- scale(embedding_scaled_64)
-
-# Embedding size 128 
-embedding_path_128 <- "output/embeddings/user_embeddings_128.csv"
-embeddings_128 <- readr::read_csv(embedding_path_128)
-user_ids <- embeddings_128[[1]]          # Save user IDs
-embedding_matrix_128 <- as.matrix(embeddings_128[, -1]) # Remove UserID column, save as matrix
-#embedding_scaled_128 <- scale(embedding_scaled_128)
-
-# Embedding size 256
-embedding_path_256 <- "output/embeddings/user_embeddings_256.csv"
-embeddings_256 <- readr::read_csv(embedding_path_256)
-user_ids <- embeddings_256[[1]]          # Save user IDs
-embedding_matrix_256 <- as.matrix(embeddings_256[, -1]) # Remove UserID column, save as matrix
-#embedding_scaled_256 <- scale(embedding_scaled_256)
-```
-
-```{r choose}
-# 2. Choose Number of Clusters
-wss <- numeric(10)
-
-for (k in 1:10) {
-  wss[k] <- kmeans(embedding_matrix, centers = k, nstart = 20)$tot.withinss
-}
-
-plot(1:10, wss, type="b", pch=19,
-     xlab="Number of Clusters",
-     ylab="Total Within-Cluster SS")
-
-
-### Choosing larger number of clusters
-embedding_matrix <- embedding_matrix_64
-
-fviz_nbclust(embedding_matrix, kmeans, method = "wss", k.max = 20)
-
-
-####
-embedding_matrix <- embedding_matrix_64   # or _128 or _256
-
-max_k <- 20
-wss <- numeric(max_k)
-
-for (k in 1:max_k) {
-  wss[k] <- kmeans(embedding_matrix, centers = k, nstart = 20)$tot.withinss
-}
-
-plot(1:max_k, wss, type = "b", pch = 19,
-     xlab = "Number of Clusters",
-     ylab = "Total Within-Cluster SS")
-```
-
-# 3. Apply k-means
-
-```{r kmeans}
-set.seed(123)
-
-k <- 5
-kmeans_result <- kmeans(
-  embedding_matrix,
-  centers = k,
-  nstart = 25
-)
-
-#print(kmeans_result)
-cluster_df <- data.frame(
-  UserID = user_ids,
-  Cluster = kmeans_result$cluster
-)
-
-head(cluster_df)
-```
-
-# 4. Visualize with PCA
-
-
-```{r pca-visual}
-pca <- prcomp(embedding_matrix)
-
-pca_df <- data.frame(
-  PC1 = pca$x[,1],
-  PC2 = pca$x[,2],
-  Cluster = as.factor(kmeans_result$cluster)
-)
-
-ggplot(pca_df, aes(x=PC1, y=PC2, color=Cluster)) +
-  geom_point(alpha=0.6) +
-  theme_minimal() +
-  ggtitle("K-Means Clusters (PCA Projection)")
-```
 
 
 # Methods and Experimental Setup {#sec-methods}
