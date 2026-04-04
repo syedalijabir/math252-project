@@ -1,1 +1,7 @@
-/data
+.Rproj.user
+.Rhistory
+.RData
+.Ruserdata
+
+output/knit-cache
+data/ml-1m.zip
