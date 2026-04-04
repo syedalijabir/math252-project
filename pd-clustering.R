@@ -1,34 +1,6 @@
----
-title: "MovieLens 1M: Clustering the Embeddings"
-author: ""
-date: "`r format(Sys.Date())`"
-output:
-  pdf_document:
-    toc: true
-    number_sections: true
-fontsize: 11pt
-geometry: margin=1in
----
-
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(
-  echo = TRUE,
-  warning = FALSE,
-  message = FALSE,
-  fig.width = 9,
-  fig.height = 6,
-  dpi = 120
-)
-set.seed(42)
-```
-
-# Overview
-
 
 # Requirements
 
-
-```{r libraries}
 required_packages <- c(
   "readr", "dplyr", "tidyr", "ggplot2",
   "cluster", "factoextra",
@@ -49,11 +21,9 @@ library(cluster)
 library(factoextra)
 library(clustertend)
 library(FPDclustering)
-```
 
 # 1. Load embeddings files
 
-```{r download-and-read}
 # Change to whichever embedding size you want
 embedding_path <- "output/embeddings/user_embeddings_128.csv"
 embeddings <- readr::read_csv(embedding_path)
@@ -62,11 +32,10 @@ embedding_matrix <- embeddings[, -1] # Remove UserID column
 
 embedding_matrix <- as.matrix(embedding_matrix)
 
-```
+
 
 # 2. Choose Number of Clusters
 
-```{r choose}
 results <- list()
 avg_silhouette <- numeric()
 
@@ -100,10 +69,8 @@ for (k in 2:20) {
   
   cat("Avg silhouette for k =", k, ":", avg_sil, "\n\n")
 }
-```
 
 # 2a. Plot Silhouette
-```{r sil}
 ks <- 2:20
 plot(ks, avg_silhouette[ks],
      type = "b",
@@ -112,10 +79,9 @@ plot(ks, avg_silhouette[ks],
      xlab = "Number of Clusters (K)",
      ylab = "Average Silhouette Width",
      main = "PD-Clustering Model Selection")
-```
+
 
 # 2b. Plot Silhouettes
-```{r silhs}
 par(mfrow = c(4, 5), mar = c(2, 2, 2, 1))
 
 for (k in 2:20) {
@@ -129,11 +95,10 @@ for (k in 2:20) {
 
 # Reset layout
 par(mfrow = c(1,1))
-```
+
 
 # 3. Choose best PD clustering
 
-```{r pdcluster}
 set.seed(123)
 
 best_k <- 4 #which.max(avg_silhouette)
@@ -142,12 +107,9 @@ plot(results[[best_k]]$silhouette,
      main = paste("Silhouette Plot for K =", best_k),
      col = "blue",
      border = NA)
-```
+
 
 # 4. Visualize with PCA
-
-
-```{r pca-visual}
 pca <- prcomp(embedding_matrix)
 
 pca_df <- data.frame(
@@ -178,4 +140,4 @@ ggplot(pca_df[pca_df$Cluster == 3, ],
   geom_point(alpha = 0.6) +
   theme_minimal() +
   ggtitle("Cluster 1 (PCA Projection)")
-```
+

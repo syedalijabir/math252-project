@@ -41,7 +41,7 @@ if (length(missing_pkgs) > 0) {
   install.packages(missing_pkgs)
 }
 
-library(reader)
+library(readr)
 library(dplyr)
 library(tidyr)
 library(ggplot2)
