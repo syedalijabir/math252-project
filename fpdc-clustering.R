@@ -18,8 +18,8 @@ TuckerFactors(embedding_matrix, 3)
 ####################### 4. TUNE k AND q #######################
 # Keep this grid small for full-data FPDC
 
-k_range <- 2:5
-q_range <- 2:4
+k_range <- 2:4
+q_range <- 2:3
 
 dmat <- dist(embedding_matrix)
 
