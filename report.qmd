@@ -77,6 +77,7 @@ When k = 10, the resulting clusters are highly imbalanced, with two dominant clu
 The presence of a few large clusters alongside several very small clusters indicates that the underlying data structure is not well-separated into many groups. Instead, the data appears to exhibit a coarse partitioning into a small number of dominant behavioral patterns.
 
 
+The k-means results with k = 2 suggest that the embedding space contains one dominant user group and one smaller but distinct subgroup. The larger cluster represents the majority of users with more typical rating behavior, while the smaller cluster appears to capture users with distinct engagement patterns, rating tendencies, or genre preferences. Differences in activity level, average ratings, and genre proportions can be used to characterize the behavioral meaning of the two groups.
 ```{r}
 source("reduced-k-means.R")
 ```
@@ -107,13 +108,7 @@ The Within-Cluster Sum of Squares (WSS) was used for k-means clustering because 
 ```
 ```{r}
 # Load saved interpretation outputs
-base_path <- "output/cluster_interpretations"
 
-rating_summary <- read_csv(file.path(base_path, "py_rating_summary.csv"), show_col_types = FALSE)
-activity_summary <- read_csv(file.path(base_path, "py_activity_summary.csv"), show_col_types = FALSE)
-top_genres <- read_csv(file.path(base_path, "py_top_genres.csv"), show_col_types = FALSE)
-demographic_summary <- read_csv(file.path(base_path, "py_demographic_summary.csv"), show_col_types = FALSE)
-cluster_profile <- read_csv(file.path(base_path, "py_cluster_profile.csv"), show_col_types = FALSE)
 ```
 
 ```{r}
@@ -121,5 +116,5 @@ cluster_profile <- read_csv(file.path(base_path, "py_cluster_profile.csv"), show
 print(k_results_mq)
 
 # Cluster profile
-print(cluster_profile)
+
 ```
