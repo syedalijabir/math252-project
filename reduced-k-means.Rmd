@@ -43,6 +43,7 @@ library(clustrd)
 
 ```
 
+# 1. Load embeddings files
 
 ```{r}
 embedding_path <- "output/embeddings/user_embeddings_128.csv"
@@ -53,111 +54,251 @@ user_ids <- embeddings[[1]]
 embedding_matrix <- embeddings[, -1]
 
 embedding_matrix <- as.matrix(embedding_matrix)
-embedding_matrix <- scale(embedding_matrix)
 
 dim(embedding_matrix)
 head(user_ids)
+```
+
+# Add caching
+
+```{r cache_setup}
+# Create folders for cached models/results and plots
+dir.create("output/rkm_cache", recursive = TRUE, showWarnings = FALSE)
+dir.create("output/rkm_plots", recursive = TRUE, showWarnings = FALSE)
+
+# Helper to build a safe tag from embedding file name
+embedding_tag <- tools::file_path_sans_ext(basename(embedding_path))
 ```
 
 ```{r}
 k_range <- 2:10
 q_range <- 2:6
 
-dmat <- dist(embedding_matrix)
+embedding_paths <- c(
+  "output/embeddings/user_embeddings_128.csv",
+  "output/embeddings/user_embeddings_256.csv",
+  "output/embeddings/user_embeddings_64.csv"
+)
 
-results_grid <- expand.grid(k = k_range, q = q_range)
-results_grid$asw <- NA
+all_results <- list()
 
-rkm_models <- vector("list", nrow(results_grid))
-
-for (i in seq_len(nrow(results_grid))) {
-  k_val <- results_grid$k[i]
-  q_val <- results_grid$q[i]
+for (embedding_path in embedding_paths) {
   
-  cat("Running RKM with k =", k_val, "and q =", q_val, "\n")
+  cat("\nProcessing:", embedding_path, "\n")
   
-  model <- cluspca(
-    embedding_matrix,
-    nclus = k_val,
-    ndim = q_val,
-    method = "RKM",
-    rotation = "varimax"
+  embeddings <- read_csv(embedding_path)
+  
+  user_ids <- embeddings[[1]]
+  embedding_matrix <- embeddings[, -1]
+  embedding_matrix <- as.matrix(embedding_matrix)
+  # embedding_matrix <- scale(embedding_matrix)
+  
+  embedding_tag <- tools::file_path_sans_ext(basename(embedding_path))
+  
+  dmat <- dist(embedding_matrix)
+  
+  results_grid <- expand.grid(k = k_range, q = q_range)
+  results_grid$asw <- NA
+  
+  rkm_models <- vector("list", nrow(results_grid))
+  
+  for (i in seq_len(nrow(results_grid))) {
+    k_val <- results_grid$k[i]
+    q_val <- results_grid$q[i]
+    
+    cache_file <- file.path(
+      "output/rkm_cache",
+      paste0("rkm_", embedding_tag, "_k", k_val, "_q", q_val, ".rds")
+    )
+    
+    if (file.exists(cache_file)) {
+      cat("Loading cached result for", embedding_tag, "k =", k_val, "q =", q_val, "\n")
+      cached <- readRDS(cache_file)
+      model <- cached$model
+      avg_sil <- cached$asw
+    } else {
+      cat("Running RKM for", embedding_tag, "k =", k_val, "q =", q_val, "\n")
+      
+      model <- cluspca(
+        embedding_matrix,
+        nclus = k_val,
+        ndim = q_val,
+        method = "RKM",
+        rotation = "varimax"
+      )
+      
+      sil <- silhouette(model$cluster, dmat)
+      avg_sil <- mean(sil[, 3])
+      
+      saveRDS(
+        list(
+          model = model,
+          asw = avg_sil,
+          k = k_val,
+          q = q_val,
+          embedding_path = embedding_path
+        ),
+        cache_file
+      )
+    }
+    
+    results_grid$asw[i] <- avg_sil
+    rkm_models[[i]] <- model
+
+  best_index <- which.max(results_grid$asw)
+  best_params <- results_grid[best_index, ]
+  
+  best_k <- best_params$k
+  best_q <- best_params$q
+  best_asw <- best_params$asw
+  best_rkm <- rkm_models[[best_index]]
+  
+  cluster_df <- data.frame(
+    UserID = user_ids,
+    Cluster = best_rkm$cluster
   )
   
-  sil <- silhouette(model$cluster, dmat)
-  avg_sil <- mean(sil[, 3])
-  
-  results_grid$asw[i] <- avg_sil
-  rkm_models[[i]] <- model
+  all_results[[embedding_tag]] <- list(
+    embedding_path = embedding_path,
+    embedding_tag = embedding_tag,
+    embedding_matrix = embedding_matrix,
+    user_ids = user_ids,
+    results_grid = results_grid,
+    best_index = best_index,
+    best_params = best_params,
+    best_k = best_k,
+    best_q = best_q,
+    best_asw = best_asw,
+    best_rkm = best_rkm,
+    cluster_df = cluster_df,
+    dmat = dmat
+  )
+  }
 }
-
-results_grid
 ```
 
 ```{r}
-best_index <- which.max(results_grid$asw)
-best_params <- results_grid[best_index, ]
+# best_index <- which.max(results_grid$asw)
+# best_params <- results_grid[best_index, ]
 
-best_k <- best_params$k
-best_q <- best_params$q
-best_asw <- best_params$asw
+# best_k <- best_params$k
+# best_q <- best_params$q
+# best_asw <- best_params$asw
 
-best_rkm <- rkm_models[[best_index]]
+# best_rkm <- rkm_models[[best_index]]
 
-best_params
+# best_params
 ```
 
 ```{r}
-ggplot(results_grid, aes(x = q, y = asw, color = factor(k), group = k)) +
-  geom_line() +
-  geom_point(size = 2) +
-  theme_minimal() +
-  labs(
-    title = "Reduced K-Means Tuning Results",
-    x = "Reduced Dimension (q)",
-    y = "Average Silhouette Width",
-    color = "Clusters (k)"
+for (name in names(all_results)) {
+  res <- all_results[[name]]
+  
+  p_tuning <- ggplot(res$results_grid, aes(x = q, y = asw, color = factor(k), group = k)) +
+    geom_line() +
+    geom_point(size = 2) +
+    theme_minimal() +
+    labs(
+      title = paste("Reduced K-Means Tuning Results -", name),
+      x = "Reduced Dimension (q)",
+      y = "Average Silhouette Width",
+      color = "Clusters (k)"
+    )
+  
+  print(p_tuning)
+  
+  ggsave(
+    filename = file.path("output/rkm_plots", paste0("tuning_", name, ".png")),
+    plot = p_tuning,
+    width = 9,
+    height = 6,
+    dpi = 120
   )
+}
 ```
 
 ```{r}
-cluster_df <- data.frame(
-  UserID = user_ids,
-  Cluster = best_rkm$cluster
-)
+# cluster_df <- data.frame(
+#   UserID = user_ids,
+#   Cluster = best_rkm$cluster
+# )
 
-head(cluster_df)
-table(cluster_df$Cluster)
+# head(cluster_df)
+# table(cluster_df$Cluster)
 ```
 
 ```{r}
-best_sil <- silhouette(best_rkm$cluster, dmat)
-
-plot(
-  best_sil,
-  main = paste("Reduced K-Means Silhouette Plot (k =", best_k, ", q =", best_q, ")"),
-  col = "blue",
-  border = NA
-)
-```
-
-```{r}
-pca <- prcomp(embedding_matrix)
-
-pca_df <- data.frame(
-  PC1 = pca$x[, 1],
-  PC2 = pca$x[, 2],
-  Cluster = as.factor(best_rkm$cluster)
-)
-
-ggplot(pca_df, aes(x = PC1, y = PC2, color = Cluster)) +
-  geom_point(alpha = 0.6) +
-  theme_minimal() +
-  labs(
-    title = paste("Reduced K-Means Clusters (PCA Projection): k =", best_k, ", q =", best_q),
-    x = "PC1",
-    y = "PC2"
+for (name in names(all_results)) {
+  res <- all_results[[name]]
+  
+  best_sil <- silhouette(res$best_rkm$cluster, res$dmat)
+  
+  png(
+    filename = file.path(
+      "output/rkm_plots",
+      paste0("silhouette_", name, "_k", res$best_k, "_q", res$best_q, ".png")
+    ),
+    width = 1200,
+    height = 800,
+    res = 120
   )
+  
+  plot(
+    best_sil,
+    main = paste("Reduced K-Means Silhouette Plot -", name,
+                 "(k =", res$best_k, ", q =", res$best_q, ")"),
+    col = "blue",
+    border = NA
+  )
+  
+  dev.off()
+  
+  # Also show inside report
+  plot(
+    best_sil,
+    main = paste("Reduced K-Means Silhouette Plot -", name,
+                 "(k =", res$best_k, ", q =", res$best_q, ")"),
+    col = "blue",
+    border = NA
+  )
+}
+```
+
+```{r}
+for (name in names(all_results)) {
+  res <- all_results[[name]]
+  
+  pca <- prcomp(res$embedding_matrix)
+  
+  pca_df <- data.frame(
+    PC1 = pca$x[, 1],
+    PC2 = pca$x[, 2],
+    Cluster = as.factor(res$best_rkm$cluster)
+  )
+  
+  p_pca <- ggplot(pca_df, aes(x = PC1, y = PC2, color = Cluster)) +
+    geom_point(alpha = 0.6) +
+    theme_minimal() +
+    labs(
+      title = paste("Reduced K-Means Clusters (PCA Projection) -", name,
+                    "k =", res$best_k, ", q =", res$best_q),
+      x = "PC1",
+      y = "PC2"
+    )
+  
+  print(p_pca)
+  
+  ggsave(
+    filename = file.path(
+      "output/rkm_plots",
+      paste0("pca_", name, "_k", res$best_k, "_q", res$best_q, ".png")
+    ),
+    plot = p_pca,
+    width = 9,
+    height = 6,
+    dpi = 120
+  )
+}
 ```
 
 ```{r}
@@ -166,15 +307,34 @@ plot(best_rkm, cludesc = TRUE)
 ```
 
 ```{r}
-write.csv(
-  cluster_df,
-  file = paste0("output/rkm_clusters_k", best_k, "_q", best_q, ".csv"),
-  row.names = FALSE
-)
-
-write.csv(
-  results_grid,
-  file = "output/rkm_tuning_results.csv",
-  row.names = FALSE
-)
+```{r}
+for (name in names(all_results)) {
+  res <- all_results[[name]]
+  
+  write.csv(
+    res$cluster_df,
+    file = file.path(
+      "output",
+      paste0("rkm_clusters_", name, "_k", res$best_k, "_q", res$best_q, ".csv")
+    ),
+    row.names = FALSE
+  )
+  
+  write.csv(
+    res$results_grid,
+    file = file.path(
+      "output",
+      paste0("rkm_tuning_results_", name, ".csv")
+    ),
+    row.names = FALSE
+  )
+  
+  saveRDS(
+    res$best_rkm,
+    file = file.path(
+      "output/rkm_cache",
+      paste0("best_rkm_", name, "_k", res$best_k, "_q", res$best_q, ".rds")
+    )
+  )
+}
 ```
