@@ -1,7 +1,7 @@
 ---
 title: "Reel Insight (working title)"
 subtitle: "MovieLens 1M: Clustering the Embeddings"
-author: "Ali Jabir and Isis Martinez"
+author: "Ali Jabir, Isis Martinez, and Susan Peck"
 thanks: "Project repository available at: [https://github.com/syedalijabir/math252-project](https://github.com/syedalijabir/math252-project)."
 date: "`r format(Sys.Date())`"
 format:
