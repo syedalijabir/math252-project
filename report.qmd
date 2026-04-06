@@ -35,7 +35,7 @@ source("k-means.R")
 
 # KMEANS METHODS
 What each algorithm means:
-1. Hartigan–Wong (default) -- most theoretically refined
+1. Hartigan???Wong (default) -- most theoretically refined
 got Quick-Transfer warnings & struggles with this data --> not ideal here
 2. Lloyd -- Most commonly used in practice (usually in ML) --> Stable, simple
 Warnings in run: "did not converge in 100 iterations" warnings
@@ -45,34 +45,34 @@ Results: no warnings + consistent results
 Best behavior for this data
 
 INTERPRETATION FOR REPORT
-Multiple k-means algorithms (Hartigan–Wong, Lloyd, and MacQueen) were evaluated to assess robustness. All algorithms produced consistent results, with k = 2 identified as the optimal number of clusters based on silhouette and Calinski–Harabasz indices. However, the Hartigan–Wong algorithm produced convergence warnings, and the Lloyd algorithm required additional iterations. The MacQueen algorithm exhibited stable behavior without convergence issues, and therefore was used for final clustering results.
+Multiple k-means algorithms (Hartigan???Wong, Lloyd, and MacQueen) were evaluated to assess robustness. All algorithms produced consistent results, with k = 2 identified as the optimal number of clusters based on silhouette and Calinski???Harabasz indices. However, the Hartigan???Wong algorithm produced convergence warnings, and the Lloyd algorithm required additional iterations. The MacQueen algorithm exhibited stable behavior without convergence issues, and therefore was used for final clustering results.
 The consistency of results across algorithms suggests that the observed clustering structure is inherent to the data rather than dependent on the optimization procedure.
 
 #KMEANS RESULTS
 What each column is telling us:
 WSS (Within-Cluster Sum of Squares) -->Decreases as k increases (expected)
 Measures compactness
-ALWAYS goes down → not enough alone to choose k
-WSS RESULTS:  Smooth decrease → no strong elbow
+ALWAYS goes down ??? not enough alone to choose k
+WSS RESULTS:  Smooth decrease ??? no strong elbow
 
 Silhouette (MOST IMPORTANT) --> Range: -1 to 1.
 0.3 = decent structure; ~0 = overlapping clusters; < 0 = bad clustering
 
 SILHOUETTE RESULTS:
-k=2 → 0.33   (GOOD); k=3 → 0.22 (OK); k≥4 → mostly negative (BAD)\
+k=2 ??? 0.33   (GOOD); k=3 ??? 0.22 (OK); k???4 ??? mostly negative (BAD)\
 strong evidence.
 
 CH (Calinski-Harabasz) --> Higher = better separation; Usually decreases as k increases
 CH RESULTS:
-k=2 → 139  (highest); k=3 → 113; k=4 → 91; ...
+k=2 ??? 139  (highest); k=3 ??? 113; k=4 ??? 91; ...
 Also favors k = 2
 
 # KMEANS INTERPRETATION
-The optimal number of clusters was selected based on multiple internal validation metrics, including silhouette score and Calinski–Harabasz index. The silhouette score was highest at k = 2 (0.33), indicating strong cluster separation. The Calinski–Harabasz index also peaked at k = 2 (139), further supporting this choice. For k ≥ 4, silhouette scores became negative, indicating poor clustering structure and overlapping clusters. Therefore, k = 2 was selected as the optimal number of clusters.
+The optimal number of clusters was selected based on multiple internal validation metrics, including silhouette score and Calinski???Harabasz index. The silhouette score was highest at k = 2 (0.33), indicating strong cluster separation. The Calinski???Harabasz index also peaked at k = 2 (139), further supporting this choice. For k ??? 4, silhouette scores became negative, indicating poor clustering structure and overlapping clusters. Therefore, k = 2 was selected as the optimal number of clusters.
 Why does this happen? The Embeddings likely capture a broad split in user behavior and not fine-grained segmentation
-2 clusters = meaningful structure; more clusters = forced splits → bad separation
+2 clusters = meaningful structure; more clusters = forced splits ??? bad separation
 
-Although k = 5 yields a positive silhouette score (0.13), it is substantially lower than the value at k = 2 (0.33), indicating weaker cluster separation. Additionally, the Calinski–Harabasz index decreases significantly as k increases. This suggests that increasing the number of clusters introduces artificial fragmentation rather than meaningful structure. Therefore, k = 2 is selected as the optimal number of clusters.
+Although k = 5 yields a positive silhouette score (0.13), it is substantially lower than the value at k = 2 (0.33), indicating weaker cluster separation. Additionally, the Calinski???Harabasz index decreases significantly as k increases. This suggests that increasing the number of clusters introduces artificial fragmentation rather than meaningful structure. Therefore, k = 2 is selected as the optimal number of clusters.
 When k = 10, the resulting clusters are highly imbalanced, with two dominant clusters containing over 1700 users each, while several clusters contain fewer than 200 users. This imbalance suggests that the algorithm is artificially subdividing a smaller number of underlying groups. This observation is consistent with the silhouette analysis, which indicated that k = 2 provides the best clustering structure. Larger values of k introduce unstable and weakly defined clusters.
 The presence of a few large clusters alongside several very small clusters indicates that the underlying data structure is not well-separated into many groups. Instead, the data appears to exhibit a coarse partitioning into a small number of dominant behavioral patterns.
 
@@ -99,7 +99,7 @@ pd_results <- readRDS("output/pd_results.rds")
 pd_pca_df <- readRDS("output/pd_pca_df.rds")
 ```
 # PD METHODS
-The Within-Cluster Sum of Squares (WSS) was used for k-means clustering because it is directly tied to the algorithm’s objective function. However, WSS is not applicable to PD clustering, which does not optimize a centroid-based objective. Therefore, method-independent validation metrics such as silhouette score and Calinski–Harabasz index were used to evaluate and select the number of clusters for PD clustering.
+The Within-Cluster Sum of Squares (WSS) was used for k-means clustering because it is directly tied to the algorithm???s objective function. However, WSS is not applicable to PD clustering, which does not optimize a centroid-based objective. Therefore, method-independent validation metrics such as silhouette score and Calinski???Harabasz index were used to evaluate and select the number of clusters for PD clustering.
 
 
 
