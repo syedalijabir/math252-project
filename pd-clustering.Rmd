@@ -29,10 +29,35 @@ set.seed(42)
 
 
 ```{r libraries}
+####################### 1. REQUIRED PACKAGES/LIBRARIES  ####################### 
 required_packages <- c(
-  "readr", "dplyr", "tidyr", "ggplot2",
-  "cluster", "factoextra",
-  "FPDclustering"
+  "readr",       # reading files 
+  "dplyr",       # data manipulation
+  "tidyr",       # splitting genres into rows
+  "ggplot2",     # plotting
+  "cluster",     # silhouette
+  "clusterCrit", # Calinski-Harabasz index
+  "factoextra",   # helper plots
+  "FPDclustering",
+  "hopkins",
+  "clustrd" # RKM requires clustrd
+)
+
+installed <- rownames(installed.packages())
+missing_pkgs <- setdiff(required_packages, installed)
+if (length(missing_pkgs) > 0) {
+  install.packages(missing_pkgs)
+}
+
+library(readr); library(dplyr); library(tidyr); library(ggplot2)
+library(cluster); library(clusterCrit); library(factoextra); 
+library(FPDclustering); library(hopkins)
+library(clustrd)
+
+required_packages <- c(
+  "readr", "dplyr", "ggplot2",
+  "cluster", "clusterCrit",
+  "factoextra", "FPDclustering"
 )
 
 installed <- rownames(installed.packages())
@@ -43,139 +68,386 @@ if (length(missing_pkgs) > 0) {
 
 library(readr)
 library(dplyr)
-library(tidyr)
 library(ggplot2)
 library(cluster)
+library(clusterCrit)
 library(factoextra)
-library(clustertend)
 library(FPDclustering)
+
+set.seed(42)
+
+# Create Files
+dir.create("output/pd_cache", recursive = TRUE, showWarnings = FALSE)
+dir.create("output/pd_plots", recursive = TRUE, showWarnings = FALSE)
 ```
 
 # 1. Load embeddings files
 
 ```{r download-and-read}
-# Change to whichever embedding size you want
-embedding_path <- "output/embeddings/user_embeddings_128.csv"
-embeddings <- readr::read_csv(embedding_path)
-user_ids <- embeddings[[1]]          # Save user IDs
-embedding_matrix <- embeddings[, -1] # Remove UserID column
+embedding_paths <- c(
+  "output/embeddings/user_embeddings_64.csv",
+  "output/embeddings/user_embeddings_128.csv",
+  "output/embeddings/user_embeddings_256.csv"
+)
 
-embedding_matrix <- as.matrix(embedding_matrix)
+k_vals <- 2:20
+all_results <- list()
 
 ```
 
-# 2. Choose Number of Clusters
-
-```{r choose}
-results <- list()
-avg_silhouette <- numeric()
-
-for (k in 2:20) {
-  cat("Running PDC for k =", k, "\n")
+# PD for all embedding sizes
+```{r Silh}
+for (embedding_path in embedding_paths) {
   
-  # Run PD Clustering
-  pdc_model <- PDC(embedding_matrix, k = k)
+  cat("\nProcessing:", embedding_path, "\n")
   
-  # Extract labels
-  labels <- pdc_model$label
+  embeddings <- read_csv(embedding_path, show_col_types = FALSE)
   
-  # Compute distance matrix
-  d <- dist(embedding_matrix)
+  user_ids <- embeddings[[1]]
+  embedding_matrix <- embeddings[, -1]
+  embedding_matrix <- scale(as.matrix(embedding_matrix))
   
-  # Compute silhouette
-  sil <- silhouette(labels, d)
+  embedding_tag <- tools::file_path_sans_ext(basename(embedding_path))
+  dmat <- dist(embedding_matrix)
   
-  #Silh(pdc_model$probability)
+  results <- vector("list", length = max(k_vals))
+  avg_silhouette <- rep(NA, max(k_vals))
+  ch_scores <- rep(NA, max(k_vals))
   
-  # Store average silhouette width
-  avg_sil <- mean(sil[, 3])
-  avg_silhouette[k] <- avg_sil
+  for (k in k_vals) {
+    cache_file <- file.path(
+      "output/pd_cache",
+      paste0("pd_", embedding_tag, "_k", k, ".rds")
+    )
+    
+    if (file.exists(cache_file)) {
+      cat("Loading cached result for", embedding_tag, "k =", k, "\n")
+      cached <- readRDS(cache_file)
+      model <- cached$model
+      labels <- cached$labels
+      sil <- cached$silhouette
+      avg_sil <- cached$avg_silhouette
+      ch_val <- cached$ch
+    } else {
+      cat("Running PDC for", embedding_tag, "k =", k, "\n")
+      
+      model <- PDC(embedding_matrix, k = k)
+      labels <- model$label
+      sil <- silhouette(labels, dmat)
+      avg_sil <- mean(sil[, 3])
+      
+      ch_val <- intCriteria(
+        traj = embedding_matrix,
+        part = as.integer(labels),
+        crit = "Calinski_Harabasz"
+      )$calinski_harabasz
+      
+      saveRDS(
+        list(
+          model = model,
+          labels = labels,
+          silhouette = sil,
+          avg_silhouette = avg_sil,
+          ch = ch_val,
+          k = k,
+          embedding_path = embedding_path
+        ),
+        cache_file
+      )
+    }
+    
+    avg_silhouette[k] <- avg_sil
+    ch_scores[k] <- ch_val
+    
+    results[[k]] <- list(
+      model = model,
+      labels = labels,
+      silhouette = sil,
+      avg_silhouette = avg_sil,
+      ch = ch_val
+    )
+  }
   
-  # Save everything
-  results[[k]] <- list(
-    model = pdc_model,
-    silhouette = sil,
-    avg_silhouette = avg_sil
+  pd_results <- data.frame(
+    Method = "PD",
+    k = k_vals,
+    Silhouette = avg_silhouette[k_vals],
+    CH = ch_scores[k_vals]
   )
   
-  cat("Avg silhouette for k =", k, ":", avg_sil, "\n\n")
+  best_k <- k_vals[which.max(avg_silhouette[k_vals])]
+  best_params <- pd_results[pd_results$k == best_k, ]
+  
+  best_model <- results[[best_k]]$model
+  best_labels <- results[[best_k]]$labels
+  best_sil <- results[[best_k]]$silhouette
+  final_avg_sil <- results[[best_k]]$avg_silhouette
+  
+  cluster_df <- data.frame(
+    UserID = user_ids,
+    Cluster = best_labels
+  )
+  
+  all_results[[embedding_tag]] <- list(
+    embedding_path = embedding_path,
+    embedding_tag = embedding_tag,
+    embedding_matrix = embedding_matrix,
+    user_ids = user_ids,
+    pd_results = pd_results,
+    results = results,
+    best_k = best_k,
+    best_params = best_params,
+    best_model = best_model,
+    best_labels = best_labels,
+    best_sil = best_sil,
+    final_avg_sil = final_avg_sil,
+    cluster_df = cluster_df,
+    dmat = dmat
+  )
 }
 ```
 
-# 2a. Plot Silhouette
-```{r sil}
-ks <- 2:20
-plot(ks, avg_silhouette[ks],
-     type = "b",
-     pch = 19,
-     col = "blue",
-     xlab = "Number of Clusters (K)",
-     ylab = "Average Silhouette Width",
-     main = "PD-Clustering Model Selection")
+
+# 2a. Show Tuning Results
+```{r Tuning}
+for (name in names(all_results)) {
+  cat("\n==========", name, "==========\n")
+  print(all_results[[name]]$pd_results)
+  cat("\nBest parameters:\n")
+  print(all_results[[name]]$best_params)
+}
+```
+
+
+
+
+# 2a. Plot Tuning Results
+```{r Tuning-plot}
+
+for (name in names(all_results)) {
+  res <- all_results[[name]]
+  
+  p_sil <- ggplot(res$pd_results, aes(x = k, y = Silhouette)) +
+    geom_line() +
+    geom_point() +
+    theme_minimal() +
+    labs(
+      title = paste("PD Model Selection by Silhouette -", name),
+      x = "Number of Clusters (k)",
+      y = "Average Silhouette Width"
+    )
+  
+  print(p_sil)
+  
+  ggsave(
+    filename = file.path("output/pd_plots", paste0("tuning_silhouette_", name, ".png")),
+    plot = p_sil,
+    width = 9,
+    height = 6,
+    dpi = 120
+  )
+}
+
+for (name in names(all_results)) {
+  res <- all_results[[name]]
+  
+  p_ch <- ggplot(res$pd_results, aes(x = k, y = CH)) +
+    geom_line() +
+    geom_point() +
+    theme_minimal() +
+    labs(
+      title = paste("PD Model Selection by CH -", name),
+      x = "Number of Clusters (k)",
+      y = "Calinski-Harabasz Index"
+    )
+  
+  print(p_ch)
+  
+  ggsave(
+    filename = file.path("output/pd_plots", paste0("tuning_ch_", name, ".png")),
+    plot = p_ch,
+    width = 9,
+    height = 6,
+    dpi = 120
+  )
+}
 ```
 
 # 2b. Plot Silhouettes
 ```{r silhs}
-par(mfrow = c(4, 5), mar = c(2, 2, 2, 1))
+#par(mfrow = c(4, 5), mar = c(2, 2, 2, 1))
 
-for (k in 2:20) {
-  sil <- results[[k]]$silhouette
+#for (k in 2:20) {
+#  sil <- results[[k]]$silhouette
   
-  plot(sil,
-       main = paste("K =", k),
-       col = "blue",
-       border = NA)
-}
+#  plot(sil,
+#       main = paste("K =", k),
+#       col = "blue",
+#       border = NA)
+#}
 
 # Reset layout
-par(mfrow = c(1,1))
+#par(mfrow = c(1,1))
 ```
 
-# 3. Choose best PD clustering
 
-```{r pdcluster}
-set.seed(123)
 
-best_k <- 4 #which.max(avg_silhouette)
 
-plot(results[[best_k]]$silhouette,
-     main = paste("Silhouette Plot for K =", best_k),
-     col = "blue",
-     border = NA)
+# 3. Inspect best soln
+
+```{r best-pd}
+for (name in names(all_results)) {
+  res <- all_results[[name]]
+  
+  png(
+    filename = file.path(
+      "output/pd_plots",
+      paste0("silhouette_", name, "_k", res$best_k, ".png")
+    ),
+    width = 1200,
+    height = 800,
+    res = 120
+  )
+  
+  plot(
+    res$best_sil,
+    main = paste("PD Silhouette Plot -", name, "(k =", res$best_k, ")"),
+    col = "blue",
+    border = NA
+  )
+  
+  dev.off()
+  
+  plot(
+    res$best_sil,
+    main = paste("PD Silhouette Plot -", name, "(k =", res$best_k, ")"),
+    col = "blue",
+    border = NA
+  )
+}
+```
+
+
+# Visualize with Silhouette
+```{r sil-plots}
+for (name in names(all_results)) {
+  res <- all_results[[name]]
+  
+  png(
+    filename = file.path(
+      "output/pd_plots",
+      paste0("silhouette_", name, "_k", res$best_k, ".png")
+    ),
+    width = 1200,
+    height = 800,
+    res = 120
+  )
+  
+  plot(
+    res$best_sil,
+    main = paste("PD Silhouette Plot -", name, "(k =", res$best_k, ")"),
+    col = "blue",
+    border = NA
+  )
+  
+  dev.off()
+  
+  plot(
+    res$best_sil,
+    main = paste("PD Silhouette Plot -", name, "(k =", res$best_k, ")"),
+    col = "blue",
+    border = NA
+  )
+}
 ```
 
 # 4. Visualize with PCA
 
 
 ```{r pca-visual}
-pca <- prcomp(embedding_matrix)
+for (name in names(all_results)) {
+  res <- all_results[[name]]
+  
+  pca <- prcomp(res$embedding_matrix)
+  var_explained <- summary(pca)$importance[2, 1:2]
+  
+  pca_df <- data.frame(
+    PC1 = pca$x[, 1],
+    PC2 = pca$x[, 2],
+    Cluster = as.factor(res$best_labels)
+  )
+  
+  p_pca <- ggplot(pca_df, aes(x = PC1, y = PC2, color = Cluster)) +
+    geom_point(alpha = 0.6) +
+    theme_minimal() +
+    labs(
+      title = paste("PD Clusters (PCA Projection) -", name, "k =", res$best_k),
+      x = paste0("PC1 (", round(100 * var_explained[1], 1), "%)"),
+      y = paste0("PC2 (", round(100 * var_explained[2], 1), "%)")
+    )
+  
+  print(p_pca)
+  
+  ggsave(
+    filename = file.path(
+      "output/pd_plots",
+      paste0("pca_", name, "_k", res$best_k, ".png")
+    ),
+    plot = p_pca,
+    width = 9,
+    height = 6,
+    dpi = 120
+  )
+}
+```
 
-pca_df <- data.frame(
-  PC1 = pca$x[,1],
-  PC2 = pca$x[,2],
-  Cluster = as.factor(results[[best_k]]$model$label)
-)
 
-ggplot(pca_df, aes(x=PC1, y=PC2, color=Cluster)) +
-  geom_point(alpha=0.6) +
-  theme_minimal() +
-  ggtitle("K-Means Clusters (PCA Projection)")
+# Cluster sizes and probability silhouette
+```{r size-sil}
+for (name in names(all_results)) {
+  res <- all_results[[name]]
+  
+  cat("\n==========", name, "==========\n")
+  cat("Best k:", res$best_k, "\n")
+  cat("Cluster sizes:\n")
+  print(table(res$best_labels))
+  cat("Probability-based silhouette:\n")
+  print(Silh(res$best_model$probability))
+}
+```
 
-ggplot(pca_df[pca_df$Cluster == 1, ], 
-       aes(x = PC1, y = PC2, color = Cluster)) +
-  geom_point(alpha = 0.6) +
-  theme_minimal() +
-  ggtitle("Cluster 1 (PCA Projection)")
 
-ggplot(pca_df[pca_df$Cluster == 2, ], 
-       aes(x = PC1, y = PC2, color = Cluster)) +
-  geom_point(alpha = 0.6) +
-  theme_minimal() +
-  ggtitle("Cluster 1 (PCA Projection)")
+# Save
+```{r save}
+# 9. SAVE RESULTS
+for (name in names(all_results)) {
+  res <- all_results[[name]]
+  
+  write.csv(
+    res$cluster_df,
+    file = file.path(
+      "output",
+      paste0("pd_clusters_", name, "_k", res$best_k, ".csv")
+    ),
+    row.names = FALSE
+  )
+  
+  write.csv(
+    res$pd_results,
+    file = file.path(
+      "output",
+      paste0("pd_tuning_results_", name, ".csv")
+    ),
+    row.names = FALSE
+  )
+  
+  saveRDS(
+    res$best_model,
+    file = file.path(
+      "output/pd_cache",
+      paste0("best_pd_", name, "_k", res$best_k, ".rds")
+    )
+  )
+}
 
-ggplot(pca_df[pca_df$Cluster == 3, ], 
-       aes(x = PC1, y = PC2, color = Cluster)) +
-  geom_point(alpha = 0.6) +
-  theme_minimal() +
-  ggtitle("Cluster 1 (PCA Projection)")
 ```
