@@ -99,6 +99,11 @@ all_results <- list()
 ```{r Silh}
 for (embedding_path in embedding_paths) {
   
+  if (!file.exists(embedding_path)) {
+    cat("Missing file:", embedding_path, "\n")
+    next
+  }
+  
   cat("\nProcessing:", embedding_path, "\n")
   
   embeddings <- read_csv(embedding_path, show_col_types = FALSE)
@@ -204,6 +209,8 @@ for (embedding_path in embedding_paths) {
     cluster_df = cluster_df,
     dmat = dmat
   )
+  
+  cat("Saved results for:", embedding_tag, "\n")
 }
 ```
 
@@ -211,10 +218,12 @@ for (embedding_path in embedding_paths) {
 # 2a. Show Tuning Results
 ```{r Tuning}
 for (name in names(all_results)) {
-  cat("\n==========", name, "==========\n")
-  print(all_results[[name]]$pd_results)
+  cat("\n\n##", name, "\n")
+  cat("\nPD results:\n")
+  print(knitr::kable(all_results[[name]]$pd_results))
+  
   cat("\nBest parameters:\n")
-  print(all_results[[name]]$best_params)
+  print(knitr::kable(all_results[[name]]$best_params))
 }
 ```
 

@@ -25,14 +25,11 @@ set.seed(42)
 # Overview
 
 
-# Requirements
-
-
+# 1. Requirements
 ```{r libraries}
 required_packages <- c(
   "readr", "dplyr", "tidyr", "ggplot2",
-  "cluster", "factoextra",
-  "FPDclustering"
+  "cluster", "clusterCrit", "factoextra"
 )
 
 installed <- rownames(installed.packages())
@@ -46,13 +43,11 @@ library(dplyr)
 library(tidyr)
 library(ggplot2)
 library(cluster)
+library(clusterCrit)
 library(factoextra)
-library(clustertend)
-library(FPDclustering)
 ```
 
-# 1. Load embeddings files
-
+# 2. Load embeddings files
 ```{r download-and-read}
 embedding_paths <- c(
   "output/embeddings/user_embeddings_64.csv",
@@ -62,15 +57,14 @@ embedding_paths <- c(
 
 k_vals <- 2:20
 all_results <- list()
+
+dir.create("output/kmeans_plots", recursive = TRUE, showWarnings = FALSE)
+dir.create("output/kmeans_cache", recursive = TRUE, showWarnings = FALSE)
 ```
 
-# 2. Choose Number of Clusters
-
-```{r choose-wss}
-
-
-
-####################### 4. KMEANS: CHOOSE NUMBER OF CLUSTERS #######################
+# 3. Choose Number of Clusters
+```{r eval-funct}
+# KMEANS: CHOOSE NUMBER OF CLUSTERS
 #* We evaluate k = 2 to 20 using:
   #* WSS (elbow method)
   #* average silhouette width
@@ -100,7 +94,7 @@ evaluate_kmeans <- function(x, k_vals, dmat, algorithm = "Hartigan-Wong",
     sil_scores[i] <- mean(sil[, 3])
     
     ch_scores[i] <- intCriteria(
-      traj = as.matrix(x),
+      traj = x,
       part = as.integer(km$cluster),
       crit = "Calinski_Harabasz"
     )$calinski_harabasz
@@ -115,62 +109,8 @@ evaluate_kmeans <- function(x, k_vals, dmat, algorithm = "Hartigan-Wong",
   )
 }
 
-# Run all three algorithms
-k_results_hw <- evaluate_kmeans(embedding_matrix, k_vals, dmat, "Hartigan-Wong")
-k_results_lloyd <- evaluate_kmeans(embedding_matrix, k_vals, dmat, "Lloyd")
-k_results_mq <- evaluate_kmeans(embedding_matrix, k_vals, dmat, "MacQueen")
-
-# Combine results into one table
-k_results_all <- dplyr::bind_rows(k_results_hw, k_results_lloyd, k_results_mq)
-
-# Comparison Table for all results (wide to be easier to compare)
-k_results_wide <- k_results_all %>% 
-  pivot_wider(names_from = Algorithm, values_from = c(WSS, Silhouette, CH))
-
-print(k_results_wide)
 ```
-
-
-
-# Comparison plots
-
-```{r kmeans}
-# 3. PLOT K-SELECTION METRICS
-
-ggplot(k_results_all, aes(x = k, y = Silhouette, color = Algorithm)) +
-  geom_line() + geom_point() + theme_minimal() + 
-  labs(title = "Silhouette by k and k-means algorithm")
-
-ggplot(k_results_all, aes(x = k, y = CH, color = Algorithm)) +
-  geom_line() + geom_point() + theme_minimal() +
-  labs(title = "Calinski-Harabasz by k and k-means algorithm")
-
-ggplot(k_results_all, aes(x = k, y = WSS, color = Algorithm)) +
-  geom_line() + geom_point() + theme_minimal() +
-  labs(title = "WSS by k and k-means algorithm")
-
-# JUST MACQUEEN --> Use MacQueen for final results, Show all algorithms agree --> Emphasize robustness, not superiority
-print(k_results_mq)
-
-
-ggplot(k_results_mq, aes(x = k, y = Silhouette, color = Algorithm)) +
-  geom_line() + geom_point() + theme_minimal() + 
-  labs(title = "Silhouette by k and k-means algorithm")
-
-ggplot(k_results_mq, aes(x = k, y = CH, color = Algorithm)) +
-  geom_line() + geom_point() + theme_minimal() +
-  labs(title = "Calinski-Harabasz by k and k-means algorithm")
-
-ggplot(k_results_mq, aes(x = k, y = WSS, color = Algorithm)) +
-  geom_line() + geom_point() + theme_minimal() +
-  labs(title = "WSS by k and k-means algorithm")
-
-```
-
-
-
-
-# 4. SELECT FINAL K #######################
+#. SELECT FINAL K
 Choose final k from MacQueen results -- Show all algorithms agree --> Emphasize robustness, not superiority
 
 * choose k using silhouette as primary criterion
@@ -178,88 +118,240 @@ Choose final k from MacQueen results -- Show all algorithms agree --> Emphasize 
 * check cluster size balance before finalizing
 * set k manually after inspecting results.
 
-```{r mq}
-# Choose final k from MacQueen results
-best_k_sil <- k_results_mq$k[which.max(k_results_mq$Silhouette)]
-best_k_ch  <- k_results_mq$k[which.max(k_results_mq$CH)]
+# 4. Loop over all embeddings
+```{r loop}
 
-cat("Best k by silhouette:", best_k_sil, "\n", "Best k by CH:", best_k_ch, "\n")
-
-final_k <- best_k_sil
-
-####################### 5. FIT FINAL K-MEANS MODEL #######################
-set.seed(123)
-
-kmeans_result <- kmeans(
-  embedding_matrix,
-  centers = final_k,
-  nstart = 100, 
-  iter.max = 100,
-  algorithm = "MacQueen"
-)
-
-# Save cluster labels with user IDs
-cluster_df <- data.frame(
-  UserID = user_ids,
-  Cluster = kmeans_result$cluster
-)
-
-# Check cluster sizes 
-table(kmeans_result$cluster)
-
-```
-
-# 9. FINAL SILHOUETTE SCORE 
-```{r}
-final_sil <- silhouette(kmeans_result$cluster, dmat)
-final_avg_sil <- mean(final_sil[, 3])
-
-cat("Final average silhouette width:", final_avg_sil, "\n")
-
-# Silhouette plot
-plot(
-  final_sil,
-  main = paste("Silhouette Plot for k =", final_k),
-  col = "blue",
-  border = NA
-)
-
-
-```
-# 4. Visualize with PCA
-
-
-```{r pca-visual}
-# For visualization, not for fitting k-means.
-pca <- prcomp(embedding_matrix)
-
-var_explained <- summary(pca)$importance[2, 1:2]
-
-pca_df <- data.frame(
-  PC1 = pca$x[, 1],
-  PC2 = pca$x[, 2],
-  Cluster = as.factor(kmeans_result$cluster)
-)
-
-ggplot(pca_df, aes(x = PC1, y = PC2, color = Cluster)) +
-  geom_point(alpha = 0.6) +
-  theme_minimal() +
-  labs(
-    title = paste("K-Means Clusters (PCA Projection), k =", final_k),
-    x = paste0("PC1 (", round(100 * var_explained[1], 1), "%)"),
-    y = paste0("PC2 (", round(100 * var_explained[2], 1), "%)")
+# Run all three algorithms
+for (embedding_path in embedding_paths) {
+  
+  if (!file.exists(embedding_path)) {
+    cat("Missing file:", embedding_path, "\n")
+    next
+  }
+  
+  cat("\nProcessing:", embedding_path, "\n")
+  
+  embeddings <- read_csv(embedding_path, show_col_types = FALSE)
+  
+  user_ids <- embeddings[[1]]
+  embedding_matrix <- embeddings[, -1]
+  embedding_matrix <- scale(as.matrix(embedding_matrix))
+  
+  embedding_tag <- tools::file_path_sans_ext(basename(embedding_path))
+  dmat <- dist(embedding_matrix)
+  
+  k_results_hw <- evaluate_kmeans(embedding_matrix, k_vals, dmat, "Hartigan-Wong")
+  k_results_lloyd <- evaluate_kmeans(embedding_matrix, k_vals, dmat, "Lloyd")
+  k_results_mq <- evaluate_kmeans(embedding_matrix, k_vals, dmat, "MacQueen")
+  
+  k_results_all <- bind_rows(k_results_hw, k_results_lloyd, k_results_mq)
+  
+  best_k_sil <- k_results_mq$k[which.max(k_results_mq$Silhouette)]
+  best_k_ch  <- k_results_mq$k[which.max(k_results_mq$CH)]
+  
+  final_k <- best_k_sil
+  
+  set.seed(123)
+  kmeans_result <- kmeans(
+    embedding_matrix,
+    centers = final_k,
+    nstart = 100,
+    iter.max = 100,
+    algorithm = "MacQueen"
   )
+  
+  cluster_df <- data.frame(
+    UserID = user_ids,
+    Cluster = kmeans_result$cluster
+  )
+  
+  final_sil <- silhouette(kmeans_result$cluster, dmat)
+  final_avg_sil <- mean(final_sil[, 3])
+  
+  pca <- prcomp(embedding_matrix)
+  var_explained <- summary(pca)$importance[2, 1:2]
+  
+  pca_df <- data.frame(
+    PC1 = pca$x[, 1],
+    PC2 = pca$x[, 2],
+    Cluster = as.factor(kmeans_result$cluster)
+  )
+  
+  all_results[[embedding_tag]] <- list(
+    embedding_path = embedding_path,
+    embedding_tag = embedding_tag,
+    embedding_matrix = embedding_matrix,
+    user_ids = user_ids,
+    dmat = dmat,
+    k_results_hw = k_results_hw,
+    k_results_lloyd = k_results_lloyd,
+    k_results_mq = k_results_mq,
+    k_results_all = k_results_all,
+    best_k_sil = best_k_sil,
+    best_k_ch = best_k_ch,
+    final_k = final_k,
+    kmeans_result = kmeans_result,
+    cluster_df = cluster_df,
+    final_sil = final_sil,
+    final_avg_sil = final_avg_sil,
+    pca_df = pca_df,
+    var_explained = var_explained
+  )
+  
+  cat("Saved results for:", embedding_tag, "\n")
+}
+```
+# 5. Show results for all embeddings
+```{r results}
+for (name in names(all_results)) {
+  cat("\n==========", name, "==========\n")
+  cat("Best k by silhouette:", all_results[[name]]$best_k_sil, "\n")
+  cat("Best k by CH:", all_results[[name]]$best_k_ch, "\n")
+  cat("Final average silhouette:", all_results[[name]]$final_avg_sil, "\n")
+  cat("Cluster sizes:\n")
+  print(table(all_results[[name]]$cluster_df$Cluster))
+}
 ```
 
+# 6. Plot tuning results for all embeddings
+```{r kmeans}
+for (name in names(all_results)) {
+  res <- all_results[[name]]
+  
+  p1 <- ggplot(res$k_results_all, aes(x = k, y = Silhouette, color = Algorithm)) +
+    geom_line() +
+    geom_point() +
+    theme_minimal() +
+    labs(title = paste("Silhouette by k -", name))
+  
+  print(p1)
+  
+  ggsave(
+    file.path("output/kmeans_plots", paste0("silhouette_", name, ".png")),
+    p1, width = 9, height = 6, dpi = 120
+  )
+  
+  p2 <- ggplot(res$k_results_all, aes(x = k, y = CH, color = Algorithm)) +
+    geom_line() +
+    geom_point() +
+    theme_minimal() +
+    labs(title = paste("CH by k -", name))
+  
+  print(p2)
+  
+  ggsave(
+    file.path("output/kmeans_plots", paste0("ch_", name, ".png")),
+    p2, width = 9, height = 6, dpi = 120
+  )
+  
+  p3 <- ggplot(res$k_results_all, aes(x = k, y = WSS, color = Algorithm)) +
+    geom_line() +
+    geom_point() +
+    theme_minimal() +
+    labs(title = paste("WSS by k -", name))
+  
+  print(p3)
+  
+  ggsave(
+    file.path("output/kmeans_plots", paste0("wss_", name, ".png")),
+    p3, width = 9, height = 6, dpi = 120
+  )
+}
+
+```
+
+# 7. Plot PCA for all embeddings
+```{r pca}
+for (name in names(all_results)) {
+  res <- all_results[[name]]
+  
+  p_pca <- ggplot(res$pca_df, aes(x = PC1, y = PC2, color = Cluster)) +
+    geom_point(alpha = 0.6) +
+    theme_minimal() +
+    labs(
+      title = paste("K-Means Clusters (PCA Projection) -", name,
+                    "k =", res$final_k),
+      x = paste0("PC1 (", round(100 * res$var_explained[1], 1), "%)"),
+      y = paste0("PC2 (", round(100 * res$var_explained[2], 1), "%)")
+    )
+  
+  print(p_pca)
+  
+  ggsave(
+    file.path("output/kmeans_plots", paste0("pca_", name, "_k", res$final_k, ".png")),
+    p_pca, width = 9, height = 6, dpi = 120
+  )
+}
+```
+
+# 8.Choose best overall embeddings
+```{r choose}
+all_best <- lapply(all_results, function(res) {
+  data.frame(
+    embedding = res$embedding_tag,
+    best_k = res$final_k,
+    Silhouette = res$final_avg_sil,
+    CH = max(res$k_results_mq$CH, na.rm = TRUE)
+  )
+})
+
+all_best_df <- bind_rows(all_best)
+print(all_best_df)
+
+best_overall_index <- with(all_best_df, order(-Silhouette, -CH))[1]
+best_overall <- all_best_df[best_overall_index, ]
+print(best_overall)
+
+best_name <- best_overall$embedding
+best_res <- all_results[[best_name]]
+
+best_kmeans <- best_res$kmeans_result
+best_cluster_df <- best_res$cluster_df
+best_pca_df <- best_res$pca_df
+best_final_k <- best_res$final_k
+```
+
+# 9. Save per-embedding results
 ```{r save}
 ####################### 11. SAVE RESULTS #######################
 
-write.csv(cluster_df, "output/kmeans_cluster_assignments.csv", row.names = FALSE)
-write.csv(k_results_all, "output/kmeans_k_selection_metrics_all.csv", row.names = FALSE)
-write.csv(k_results_mq, "output/kmeans_k_selection_metrics_macqueen.csv", row.names = FALSE)
-
-saveRDS(kmeans_result, "output/kmeans_result.rds")
-saveRDS(k_results_all, "output/k_results_all.rds")
-saveRDS(k_results_mq, "output/k_results_mq.rds")
+for (name in names(all_results)) {
+  res <- all_results[[name]]
+  
+  write.csv(
+    res$cluster_df,
+    file = file.path("output", paste0("kmeans_clusters_", name, "_k", res$final_k, ".csv")),
+    row.names = FALSE
+  )
+  
+  write.csv(
+    res$k_results_all,
+    file = file.path("output", paste0("kmeans_k_selection_metrics_all_", name, ".csv")),
+    row.names = FALSE
+  )
+  
+  write.csv(
+    res$k_results_mq,
+    file = file.path("output", paste0("kmeans_k_selection_metrics_macqueen_", name, ".csv")),
+    row.names = FALSE
+  )
+  
+  saveRDS(
+    res$kmeans_result,
+    file = file.path("output/kmeans_cache", paste0("kmeans_result_", name, ".rds"))
+  )
+  
+  saveRDS(
+    res$k_results_all,
+    file = file.path("output/kmeans_cache", paste0("k_results_all_", name, ".rds"))
+  )
+  
+  saveRDS(
+    res$k_results_mq,
+    file = file.path("output/kmeans_cache", paste0("k_results_mq_", name, ".rds"))
+  )
+}
 
 ```
+
+
