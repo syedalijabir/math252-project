@@ -50,9 +50,8 @@ library(factoextra)
 # 2. Load embeddings files
 ```{r download-and-read}
 embedding_paths <- c(
-  "output/embeddings/user_embeddings_64.csv",
-  "output/embeddings/user_embeddings_128.csv",
-  "output/embeddings/user_embeddings_256.csv"
+  "output/embeddings/user_embeddings_64.csv"  , "output/embeddings/user_embeddings_128.csv",
+   "output/embeddings/user_embeddings_256.csv"
 )
 
 k_vals <- 2:20
@@ -70,6 +69,12 @@ dir.create("output/kmeans_cache", recursive = TRUE, showWarnings = FALSE)
   #* average silhouette width
   #* Calinski-Harabasz (CH) index
 # Function to evaluate one k-means algorithm across all k
+# KMEANS: CHOOSE NUMBER OF CLUSTERS
+# We evaluate k = 2 to 20 using:
+# - WSS (elbow method)
+# - average silhouette width
+# - Calinski-Harabasz (CH) index
+
 evaluate_kmeans <- function(x, k_vals, dmat, algorithm = "Hartigan-Wong",
                             nstart = 10, iter.max = 100) {
   
@@ -109,14 +114,36 @@ evaluate_kmeans <- function(x, k_vals, dmat, algorithm = "Hartigan-Wong",
   )
 }
 
+# Detect elbow from WSS curve using maximum distance to the line
+find_elbow_k <- function(k, wss) {
+  pts <- cbind(k, wss)
+  p1 <- pts[1, ]
+  p2 <- pts[nrow(pts), ]
+  
+  point_line_distance <- function(p, a, b) {
+    num <- abs((b[2] - a[2]) * p[1] - (b[1] - a[1]) * p[2] + b[1] * a[2] - b[2] * a[1])
+    den <- sqrt((b[2] - a[2])^2 + (b[1] - a[1])^2)
+    num / den
+  }
+  
+  distances <- apply(pts, 1, point_line_distance, a = p1, b = p2)
+  elbow_index <- which.max(distances)
+  
+  list(
+    elbow_k = k[elbow_index],
+    distances = distances
+  )
+}
+
+
 ```
 #. SELECT FINAL K
 Choose final k from MacQueen results -- Show all algorithms agree --> Emphasize robustness, not superiority
 
-* choose k using silhouette as primary criterion
-* use CH as confirmation
+* choose k using the elbow method on WSS as the primary criterion
+* use silhouette and CH as supporting diagnostics
 * check cluster size balance before finalizing
-* set k manually after inspecting results.
+* set k manually after inspecting results if needed
 
 # 4. Loop over all embeddings
 ```{r loop}
@@ -148,9 +175,14 @@ for (embedding_path in embedding_paths) {
   
   best_k_sil <- k_results_mq$k[which.max(k_results_mq$Silhouette)]
   best_k_ch  <- k_results_mq$k[which.max(k_results_mq$CH)]
+
+  elbow_info <- find_elbow_k(k_results_mq$k, k_results_mq$WSS)
+  best_k_elbow <- elbow_info$elbow_k
+
+# Use elbow as the primary selection rule
+final_k <- best_k_elbow
   
-  final_k <- best_k_sil
-  
+
   set.seed(123)
   kmeans_result <- kmeans(
     embedding_matrix,
@@ -178,17 +210,16 @@ for (embedding_path in embedding_paths) {
   )
   
   all_results[[embedding_tag]] <- list(
-    embedding_path = embedding_path,
-    embedding_tag = embedding_tag,
-    embedding_matrix = embedding_matrix,
-    user_ids = user_ids,
-    dmat = dmat,
+    embedding_path = embedding_path, embedding_tag = embedding_tag, 
+    embedding_matrix = embedding_matrix, user_ids = user_ids, dmat = dmat,
     k_results_hw = k_results_hw,
     k_results_lloyd = k_results_lloyd,
     k_results_mq = k_results_mq,
     k_results_all = k_results_all,
     best_k_sil = best_k_sil,
     best_k_ch = best_k_ch,
+    best_k_elbow = best_k_elbow,
+    elbow_distances = elbow_info$distances,
     final_k = final_k,
     kmeans_result = kmeans_result,
     cluster_df = cluster_df,
@@ -196,7 +227,7 @@ for (embedding_path in embedding_paths) {
     final_avg_sil = final_avg_sil,
     pca_df = pca_df,
     var_explained = var_explained
-  )
+    )
   
   cat("Saved results for:", embedding_tag, "\n")
 }
@@ -205,6 +236,7 @@ for (embedding_path in embedding_paths) {
 ```{r results}
 for (name in names(all_results)) {
   cat("\n==========", name, "==========\n")
+  cat("Best k by elbow:", all_results[[name]]$best_k_elbow, "\n")
   cat("Best k by silhouette:", all_results[[name]]$best_k_sil, "\n")
   cat("Best k by CH:", all_results[[name]]$best_k_ch, "\n")
   cat("Final average silhouette:", all_results[[name]]$final_avg_sil, "\n")
@@ -214,7 +246,7 @@ for (name in names(all_results)) {
 ```
 
 # 6. Plot tuning results for all embeddings
-```{r kmeans}
+```{r plots}
 for (name in names(all_results)) {
   res <- all_results[[name]]
   
@@ -245,10 +277,15 @@ for (name in names(all_results)) {
   )
   
   p3 <- ggplot(res$k_results_all, aes(x = k, y = WSS, color = Algorithm)) +
-    geom_line() +
-    geom_point() +
-    theme_minimal() +
-    labs(title = paste("WSS by k -", name))
+    geom_line() + geom_point() + geom_vline(
+      xintercept = res$best_k_elbow, linetype = "dashed", color = "black",
+      linewidth = 1
+      ) +
+    annotate("text", x = res$best_k_elbow, 
+             y = max(res$k_results_all$WSS, na.rm = TRUE),
+             label = paste("Elbow k =", res$best_k_elbow),
+             vjust = -0.5, color = "black") +
+    theme_minimal() +  labs(title = paste("WSS by k (Elbow Method) -", name))
   
   print(p3)
   
@@ -257,6 +294,9 @@ for (name in names(all_results)) {
     p3, width = 9, height = 6, dpi = 120
   )
 }
+
+
+
 
 ```
 
@@ -290,15 +330,16 @@ all_best <- lapply(all_results, function(res) {
   data.frame(
     embedding = res$embedding_tag,
     best_k = res$final_k,
-    Silhouette = res$final_avg_sil,
-    CH = max(res$k_results_mq$CH, na.rm = TRUE)
+    Elbow_k = res$best_k_elbow,
+    Silhouette_at_elbow = res$final_avg_sil,
+    CH_max = max(res$k_results_mq$CH, na.rm = TRUE)
   )
 })
 
 all_best_df <- bind_rows(all_best)
 print(all_best_df)
 
-best_overall_index <- with(all_best_df, order(-Silhouette, -CH))[1]
+best_overall_index <- with(all_best_df, order(-Silhouette_at_elbow, -CH_max))[1]
 best_overall <- all_best_df[best_overall_index, ]
 print(best_overall)
 
