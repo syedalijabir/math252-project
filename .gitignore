@@ -3,6 +3,8 @@
 .RData
 .Ruserdata
 
+*.pdf
+
 output/knit-cache
 output/pd_cache
 ouptut/kmeans_cache
