@@ -98,7 +98,7 @@ for (embedding_path in embedding_paths) {
   dmat <- dist(embedding_matrix)
   
   results_grid <- expand.grid(k = k_range, q = q_range)
-  results_grid$asw <- NA
+  results_grid$asw <- NA_real_
   
   rkm_models <- vector("list", nrow(results_grid))
   
@@ -113,9 +113,12 @@ for (embedding_path in embedding_paths) {
     
     if (file.exists(cache_file)) {
       cat("Loading cached result for", embedding_tag, "k =", k_val, "q =", q_val, "\n")
+      
       cached <- readRDS(cache_file)
+      
       model <- cached$model
       avg_sil <- cached$asw
+      
     } else {
       cat("Running RKM for", embedding_tag, "k =", k_val, "q =", q_val, "\n")
       
@@ -144,7 +147,8 @@ for (embedding_path in embedding_paths) {
     
     results_grid$asw[i] <- avg_sil
     rkm_models[[i]] <- model
-
+  }
+  
   best_index <- which.max(results_grid$asw)
   best_params <- results_grid[best_index, ]
   
@@ -173,7 +177,6 @@ for (embedding_path in embedding_paths) {
     cluster_df = cluster_df,
     dmat = dmat
   )
-  }
 }
 ```
 
