@@ -68,66 +68,73 @@ dir.create("output/kmeans_results", recursive = TRUE, showWarnings = FALSE)
 ```{r load-saved}
 load_kmeans_cached_results <- function(embedding_path) {
   embeddings <- read_csv(embedding_path, show_col_types = FALSE)
-  
+
   user_ids <- embeddings[[1]]
   embedding_matrix <- embeddings[, -1]
   embedding_matrix <- scale(as.matrix(embedding_matrix))
-  
-  embedding_tag <- tools::file_path_sans_ext(basename(embedding_path))
-  full_file <- file.path(
-    "output/kmeans_cache", paste0("kmeans_full_result_", 
-                                  embedding_tag, ".rds")
-    )
 
-if (file.exists(full_file)) {
-  all_results[[embedding_tag]] <- readRDS(full_file)
-  next
-}
-  
+  embedding_tag <- tools::file_path_sans_ext(basename(embedding_path))
+
+  full_file <- file.path(
+    "output/kmeans_cache",
+    paste0("kmeans_full_result_", embedding_tag, ".rds")
+  )
+
+  if (file.exists(full_file)) {
+    return(readRDS(full_file))
+  }
+
   dmat <- dist(embedding_matrix)
-  
+
   kmeans_file <- file.path("output/kmeans_cache", paste0("kmeans_result_", embedding_tag, ".rds"))
   all_file    <- file.path("output/kmeans_cache", paste0("k_results_all_", embedding_tag, ".rds"))
   mq_file     <- file.path("output/kmeans_cache", paste0("k_results_mq_", embedding_tag, ".rds"))
-  
+  hw_file     <- file.path("output/kmeans_cache", paste0("k_results_hw_", embedding_tag, ".rds"))
+  lloyd_file  <- file.path("output/kmeans_cache", paste0("k_results_lloyd_", embedding_tag, ".rds"))
+
   if (!file.exists(kmeans_file) || !file.exists(all_file) || !file.exists(mq_file)) {
     return(NULL)
   }
-  
+
   kmeans_result <- readRDS(kmeans_file)
   k_results_all <- readRDS(all_file)
   k_results_mq  <- readRDS(mq_file)
-  
+
+  k_results_hw <- if (file.exists(hw_file)) readRDS(hw_file) else NULL
+  k_results_lloyd <- if (file.exists(lloyd_file)) readRDS(lloyd_file) else NULL
+
   best_k_sil <- k_results_mq$k[which.max(k_results_mq$Silhouette)]
   best_k_ch  <- k_results_mq$k[which.max(k_results_mq$CH)]
-  
+
   elbow_info <- find_elbow_k(k_results_mq$k, k_results_mq$WSS)
   best_k_elbow <- elbow_info$elbow_k
-  final_k <- kmeans_result$centers |> nrow()
-  
+  final_k <- nrow(kmeans_result$centers)
+
   cluster_df <- data.frame(
     UserID = user_ids,
     Cluster = kmeans_result$cluster
   )
-  
+
   final_sil <- silhouette(kmeans_result$cluster, dmat)
   final_avg_sil <- mean(final_sil[, 3])
-  
+
   pca <- prcomp(embedding_matrix)
   var_explained <- summary(pca)$importance[2, 1:2]
-  
+
   pca_df <- data.frame(
     PC1 = pca$x[, 1],
     PC2 = pca$x[, 2],
     Cluster = as.factor(kmeans_result$cluster)
   )
-  
+
   list(
     embedding_path = embedding_path,
     embedding_tag = embedding_tag,
     embedding_matrix = embedding_matrix,
     user_ids = user_ids,
     dmat = dmat,
+    k_results_hw = k_results_hw,
+    k_results_lloyd = k_results_lloyd,
     k_results_mq = k_results_mq,
     k_results_all = k_results_all,
     best_k_sil = best_k_sil,
@@ -143,6 +150,7 @@ if (file.exists(full_file)) {
     var_explained = var_explained
   )
 }
+
 ```
 
 
@@ -251,17 +259,18 @@ for (embedding_path in embedding_paths) {
   
   embedding_tag <- tools::file_path_sans_ext(basename(embedding_path))
   
+  full_file <- file.path("output/kmeans_cache", paste0("kmeans_full_result_", embedding_tag, ".rds"))
+
+  if (file.exists(full_file)) {
+    cat("Loading FULL cached result for:", embedding_tag, "\n")
+    all_results[[embedding_tag]] <- readRDS(full_file)
+    next
+  }
+  
   kmeans_file <- file.path("output/kmeans_cache", paste0("kmeans_result_", embedding_tag, ".rds"))
   all_file    <- file.path("output/kmeans_cache", paste0("k_results_all_", embedding_tag, ".rds"))
   mq_file     <- file.path("output/kmeans_cache", paste0("k_results_mq_", embedding_tag, ".rds"))
   
-  if (file.exists(kmeans_file) && file.exists(all_file) && file.exists(mq_file)) {
-    cat("Loading cached results for:", embedding_tag, "\n")
-    
-    cached_res <- load_kmeans_cached_results(embedding_path)
-    all_results[[embedding_tag]] <- cached_res
-    next
-  }
   
   cat("Running k-means for:", embedding_tag, "\n")
   
