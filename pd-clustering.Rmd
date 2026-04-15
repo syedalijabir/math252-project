@@ -1,5 +1,5 @@
 ---
-title: "MovieLens 1M: Clustering the Embeddings"
+title: "MovieLens 1M: Factorial PD Clustering the Embeddings"
 author: ""
 date: "`r format(Sys.Date())`"
 output:
@@ -22,81 +22,45 @@ knitr::opts_chunk$set(
 set.seed(42)
 ```
 
-# Overview
-
-
-# Requirements
-
-
-```{r libraries}
-####################### 1. REQUIRED PACKAGES/LIBRARIES  ####################### 
-required_packages <- c(
-  "readr",       # reading files 
-  "dplyr",       # data manipulation
-  "tidyr",       # splitting genres into rows
-  "ggplot2",     # plotting
-  "cluster",     # silhouette
-  "clusterCrit", # Calinski-Harabasz index
-  "factoextra",   # helper plots
-  "FPDclustering",
-  "hopkins",
-  "clustrd" # RKM requires clustrd
-)
-
-installed <- rownames(installed.packages())
-missing_pkgs <- setdiff(required_packages, installed)
-if (length(missing_pkgs) > 0) {
-  install.packages(missing_pkgs)
-}
-
-library(readr); library(dplyr); library(tidyr); library(ggplot2)
-library(cluster); library(clusterCrit); library(factoextra); 
-library(FPDclustering); library(hopkins)
-library(clustrd)
-
-required_packages <- c(
-  "readr", "dplyr", "ggplot2",
-  "cluster", "clusterCrit",
-  "factoextra", "FPDclustering"
-)
-
-installed <- rownames(installed.packages())
-missing_pkgs <- setdiff(required_packages, installed)
-if (length(missing_pkgs) > 0) {
-  install.packages(missing_pkgs)
-}
+```{r libs}
 
 library(readr)
 library(dplyr)
 library(ggplot2)
 library(cluster)
-library(clusterCrit)
 library(factoextra)
+library(clusterCrit)
 library(FPDclustering)
-
-set.seed(42)
-
-# Create Files
-dir.create("output/pd_cache", recursive = TRUE, showWarnings = FALSE)
-dir.create("output/pd_plots", recursive = TRUE, showWarnings = FALSE)
 ```
 
-# 1. Load embeddings files
+# Create cashed and plot folders
+```{r dirs}
+dir.create("output/fpdc_cache", recursive = TRUE, showWarnings = FALSE)
+dir.create("output/fpdc_plots", recursive = TRUE, showWarnings = FALSE)
+dir.create("output/fpdc_results", recursive = TRUE, showWarnings = FALSE)
+```
 
-```{r download-and-read}
+# 1. Embedding files and tuning ranges
+```{r}
 embedding_paths <- c(
   "output/embeddings/user_embeddings_64.csv",
   "output/embeddings/user_embeddings_128.csv",
   "output/embeddings/user_embeddings_256.csv"
 )
 
-k_vals <- 2:20
+# Smaller grid is safer for FPDC
+k_range <- 2:5
+q_range <- 2:4
+
 all_results <- list()
 
 ```
 
-# PD for all embedding sizes
-```{r Silh}
+# 2 Fit embeddings with caching
+```{r caching}
+
+start_time <- Sys.time()
+
 for (embedding_path in embedding_paths) {
   
   if (!file.exists(embedding_path)) {
@@ -113,31 +77,62 @@ for (embedding_path in embedding_paths) {
   embedding_matrix <- scale(as.matrix(embedding_matrix))
   
   embedding_tag <- tools::file_path_sans_ext(basename(embedding_path))
+  
+  full_cache_file <- file.path(
+    "output/fpdc_cache",
+    paste0("fpdc_full_result_", embedding_tag, ".rds")
+  )
+  
+  # Prefer loading full saved result
+  if (file.exists(full_cache_file)) {
+    cat("Loading full cached result for:", embedding_tag, "\n")
+    all_results[[embedding_tag]] <- readRDS(full_cache_file)
+    next
+  }
+  
   dmat <- dist(embedding_matrix)
   
-  results <- vector("list", length = max(k_vals))
-  avg_silhouette <- rep(NA, max(k_vals))
-  ch_scores <- rep(NA, max(k_vals))
+  results_grid <- expand.grid(k = k_range, q = q_range)
+  results_grid$Silhouette <- NA_real_
+  results_grid$CH <- NA_real_
+  results_grid$ProbSilh <- NA_real_
   
-  for (k in k_vals) {
+  total_jobs <- nrow(results_grid)
+  pb <- txtProgressBar(min = 0, max = total_jobs, style = 3)
+  
+  fpdc_models <- vector("list", nrow(results_grid))
+  
+  for (i in seq_len(nrow(results_grid))) {
+    
+    setTxtProgressBar(pb, i)
+    
+    k_val <- results_grid$k[i]
+    q_val <- results_grid$q[i]
+    
     cache_file <- file.path(
-      "output/pd_cache",
-      paste0("pd_", embedding_tag, "_k", k, ".rds")
+      "output/fpdc_cache",
+      paste0("fpdc_", embedding_tag, "_k", k_val, "_q", q_val, ".rds")
     )
     
     if (file.exists(cache_file)) {
-      cat("Loading cached result for", embedding_tag, "k =", k, "\n")
+      cat("Loading cached result for", embedding_tag, "k =", k_val, "q =", q_val, "\n")
       cached <- readRDS(cache_file)
       model <- cached$model
-      labels <- cached$labels
-      sil <- cached$silhouette
-      avg_sil <- cached$avg_silhouette
-      ch_val <- cached$ch
+      avg_sil <- cached$Silhouette
+      ch_val <- cached$CH
+      prob_sil <- cached$ProbSilh
     } else {
-      cat("Running PDC for", embedding_tag, "k =", k, "\n")
+      cat("Running FPDC for", embedding_tag, "k =", k_val, "q =", q_val, "\n")
       
-      model <- PDC(embedding_matrix, k = k)
+      model <- FPDC(
+        embedding_matrix,
+        k_val,
+        20,
+        q_val
+      )
+      
       labels <- model$label
+      
       sil <- silhouette(labels, dmat)
       avg_sil <- mean(sil[, 3])
       
@@ -147,46 +142,38 @@ for (embedding_path in embedding_paths) {
         crit = "Calinski_Harabasz"
       )$calinski_harabasz
       
+      prob_sil <- Silh(model$probability)
+      
       saveRDS(
         list(
           model = model,
-          labels = labels,
-          silhouette = sil,
-          avg_silhouette = avg_sil,
-          ch = ch_val,
-          k = k,
+          Silhouette = avg_sil,
+          CH = ch_val,
+          ProbSilh = prob_sil,
+          k = k_val,
+          q = q_val,
           embedding_path = embedding_path
         ),
         cache_file
       )
     }
     
-    avg_silhouette[k] <- avg_sil
-    ch_scores[k] <- ch_val
-    
-    results[[k]] <- list(
-      model = model,
-      labels = labels,
-      silhouette = sil,
-      avg_silhouette = avg_sil,
-      ch = ch_val
-    )
+    results_grid$Silhouette[i] <- avg_sil
+    results_grid$CH[i] <- ch_val
+    results_grid$ProbSilh[i] <- prob_sil
+    fpdc_models[[i]] <- model
   }
   
-  pd_results <- data.frame(
-    Method = "PD",
-    k = k_vals,
-    Silhouette = avg_silhouette[k_vals],
-    CH = ch_scores[k_vals]
-  )
+  close(pb)
   
-  best_k <- k_vals[which.max(avg_silhouette[k_vals])]
-  best_params <- pd_results[pd_results$k == best_k, ]
+  # Best model: silhouette primary, CH secondary
+  best_index <- which.max(results_grid$Silhouette)
+  best_params <- results_grid[best_index, ]
   
-  best_model <- results[[best_k]]$model
-  best_labels <- results[[best_k]]$labels
-  best_sil <- results[[best_k]]$silhouette
-  final_avg_sil <- results[[best_k]]$avg_silhouette
+  best_k <- best_params$k
+  best_q <- best_params$q
+  best_fpdc <- fpdc_models[[best_index]]
+  best_labels <- best_fpdc$label
   
   cluster_df <- data.frame(
     UserID = user_ids,
@@ -198,58 +185,58 @@ for (embedding_path in embedding_paths) {
     embedding_tag = embedding_tag,
     embedding_matrix = embedding_matrix,
     user_ids = user_ids,
-    pd_results = pd_results,
-    results = results,
-    best_k = best_k,
+    results_grid = results_grid,
+    best_index = best_index,
     best_params = best_params,
-    best_model = best_model,
+    best_k = best_k,
+    best_q = best_q,
+    best_fpdc = best_fpdc,
     best_labels = best_labels,
-    best_sil = best_sil,
-    final_avg_sil = final_avg_sil,
     cluster_df = cluster_df,
     dmat = dmat
   )
   
-  cat("Saved results for:", embedding_tag, "\n")
+  cat("Finished:", embedding_tag, "\n")
 }
 ```
 
 
-# 2a. Show Tuning Results
-```{r Tuning}
+# 2. Inspect possible factor dimensions
+```{r dims}
+# TuckerFactors(embedding_matrix, 6)
+```
+
+# 3. Show tuning results
+
+```{r tune}
 for (name in names(all_results)) {
-  cat("\n\n##", name, "\n")
-  cat("\nPD results:\n")
-  print(knitr::kable(all_results[[name]]$pd_results))
-  
+  cat("\n==========", name, "==========\n")
+  print(all_results[[name]]$results_grid)
   cat("\nBest parameters:\n")
-  print(knitr::kable(all_results[[name]]$best_params))
+  print(all_results[[name]]$best_params)
 }
 ```
 
-
-
-
-# 2a. Plot Tuning Results
-```{r Tuning-plot}
-
+# 4. Plot tuning results for each embedding
+```{r tune-plots}
 for (name in names(all_results)) {
   res <- all_results[[name]]
   
-  p_sil <- ggplot(res$pd_results, aes(x = k, y = Silhouette)) +
+  p_sil <- ggplot(res$results_grid, aes(x = q, y = Silhouette, color = factor(k), group = k)) +
     geom_line() +
-    geom_point() +
+    geom_point(size = 2) +
     theme_minimal() +
     labs(
-      title = paste("PD Model Selection by Silhouette -", name),
-      x = "Number of Clusters (k)",
-      y = "Average Silhouette Width"
+      title = paste("FPDC Tuning Results (Silhouette) -", name),
+      x = "Factor Dimension (q)",
+      y = "Average Silhouette Width",
+      color = "Clusters (k)"
     )
   
   print(p_sil)
   
   ggsave(
-    filename = file.path("output/pd_plots", paste0("tuning_silhouette_", name, ".png")),
+    filename = file.path("output/fpdc_plots", paste0("tuning_silhouette_", name, ".png")),
     plot = p_sil,
     width = 9,
     height = 6,
@@ -260,20 +247,21 @@ for (name in names(all_results)) {
 for (name in names(all_results)) {
   res <- all_results[[name]]
   
-  p_ch <- ggplot(res$pd_results, aes(x = k, y = CH)) +
+  p_ch <- ggplot(res$results_grid, aes(x = q, y = CH, color = factor(k), group = k)) +
     geom_line() +
-    geom_point() +
+    geom_point(size = 2) +
     theme_minimal() +
     labs(
-      title = paste("PD Model Selection by CH -", name),
-      x = "Number of Clusters (k)",
-      y = "Calinski-Harabasz Index"
+      title = paste("FPDC Tuning Results (CH) -", name),
+      x = "Factor Dimension (q)",
+      y = "Calinski-Harabasz Index",
+      color = "Clusters (k)"
     )
   
   print(p_ch)
   
   ggsave(
-    filename = file.path("output/pd_plots", paste0("tuning_ch_", name, ".png")),
+    filename = file.path("output/fpdc_plots", paste0("tuning_ch_", name, ".png")),
     plot = p_ch,
     width = 9,
     height = 6,
@@ -282,103 +270,48 @@ for (name in names(all_results)) {
 }
 ```
 
-# 2b. Plot Silhouettes
-```{r silhs}
-#par(mfrow = c(4, 5), mar = c(2, 2, 2, 1))
+```{r best}
+all_best <- lapply(all_results, function(res) {
+  data.frame(
+    embedding = res$embedding_tag,
+    k = res$best_k,
+    q = res$best_q,
+    Silhouette = res$best_params$Silhouette,
+    CH = res$best_params$CH,
+    ProbSilh = res$best_params$ProbSilh
+  )
+})
 
-#for (k in 2:20) {
-#  sil <- results[[k]]$silhouette
-  
-#  plot(sil,
-#       main = paste("K =", k),
-#       col = "blue",
-#       border = NA)
-#}
+all_best_df <- dplyr::bind_rows(all_best)
+print(all_best_df)
 
-# Reset layout
-#par(mfrow = c(1,1))
+best_overall_index <- with(all_best_df, order(-Silhouette, -CH))[1]
+best_overall <- all_best_df[best_overall_index, ]
+print(best_overall)
+
+best_name <- best_overall$embedding
+best_res <- all_results[[best_name]]
+
+best_fpdc <- best_res$best_fpdc
+best_params <- best_res$best_params
+best_k <- best_res$best_k
+best_q <- best_res$best_q
+best_labels <- best_res$best_labels
+cluster_df <- best_res$cluster_df
+best_dmat <- best_res$dmat
+best_embedding_matrix <- best_res$embedding_matrix
+best_results_grid <- best_res$results_grid
+
 ```
 
 
 
-
-# 3. Inspect best soln
-
-```{r best-pd}
-for (name in names(all_results)) {
-  res <- all_results[[name]]
-  
-  png(
-    filename = file.path(
-      "output/pd_plots",
-      paste0("silhouette_", name, "_k", res$best_k, ".png")
-    ),
-    width = 1200,
-    height = 800,
-    res = 120
-  )
-  
-  plot(
-    res$best_sil,
-    main = paste("PD Silhouette Plot -", name, "(k =", res$best_k, ")"),
-    col = "blue",
-    border = NA
-  )
-  
-  dev.off()
-  
-  plot(
-    res$best_sil,
-    main = paste("PD Silhouette Plot -", name, "(k =", res$best_k, ")"),
-    col = "blue",
-    border = NA
-  )
-}
-```
-
-
-# Visualize with Silhouette
-```{r sil-plots}
-for (name in names(all_results)) {
-  res <- all_results[[name]]
-  
-  png(
-    filename = file.path(
-      "output/pd_plots",
-      paste0("silhouette_", name, "_k", res$best_k, ".png")
-    ),
-    width = 1200,
-    height = 800,
-    res = 120
-  )
-  
-  plot(
-    res$best_sil,
-    main = paste("PD Silhouette Plot -", name, "(k =", res$best_k, ")"),
-    col = "blue",
-    border = NA
-  )
-  
-  dev.off()
-  
-  plot(
-    res$best_sil,
-    main = paste("PD Silhouette Plot -", name, "(k =", res$best_k, ")"),
-    col = "blue",
-    border = NA
-  )
-}
-```
-
-# 4. Visualize with PCA
-
-
-```{r pca-visual}
+# 5. PCA plots for best models
+```{r}
 for (name in names(all_results)) {
   res <- all_results[[name]]
   
   pca <- prcomp(res$embedding_matrix)
-  var_explained <- summary(pca)$importance[2, 1:2]
   
   pca_df <- data.frame(
     PC1 = pca$x[, 1],
@@ -390,17 +323,18 @@ for (name in names(all_results)) {
     geom_point(alpha = 0.6) +
     theme_minimal() +
     labs(
-      title = paste("PD Clusters (PCA Projection) -", name, "k =", res$best_k),
-      x = paste0("PC1 (", round(100 * var_explained[1], 1), "%)"),
-      y = paste0("PC2 (", round(100 * var_explained[2], 1), "%)")
+      title = paste("FPDC Clusters (PCA Projection) -", name,
+                    "k =", res$best_k, ", q =", res$best_q),
+      x = "PC1",
+      y = "PC2"
     )
   
   print(p_pca)
   
   ggsave(
     filename = file.path(
-      "output/pd_plots",
-      paste0("pca_", name, "_k", res$best_k, ".png")
+      "output/fpdc_plots",
+      paste0("pca_", name, "_k", res$best_k, "_q", res$best_q, ".png")
     ),
     plot = p_pca,
     width = 9,
@@ -410,53 +344,106 @@ for (name in names(all_results)) {
 }
 ```
 
-
-# Cluster sizes and probability silhouette
-```{r size-sil}
+# 6. Probability silhouette and cluster sizes
+```{r prob-sil}
 for (name in names(all_results)) {
   res <- all_results[[name]]
   
   cat("\n==========", name, "==========\n")
   cat("Best k:", res$best_k, "\n")
+  cat("Best q:", res$best_q, "\n")
   cat("Cluster sizes:\n")
   print(table(res$best_labels))
   cat("Probability-based silhouette:\n")
-  print(Silh(res$best_model$probability))
+  print(Silh(res$best_fpdc$probability))
 }
 ```
 
 
-# Save
+# 8. PCA visualization
+```{r}
+pca <- prcomp(best_embedding_matrix)
+
+pca_df <- data.frame(
+  PC1 = pca$x[, 1],
+  PC2 = pca$x[, 2],
+  Cluster = as.factor(best_labels)
+)
+
+ggplot(pca_df, aes(x = PC1, y = PC2, color = Cluster)) +
+  geom_point(alpha = 0.6) +
+  theme_minimal() +
+  labs(
+    title = paste("FPDC Clusters (PCA Projection) -", best_name,
+                  "k =", best_k, ", q =", best_q),
+    x = "PC1",
+    y = "PC2"
+  )
+```
+
+# 9. Probability-based silhouette
+```{r}
+Silh(best_fpdc$probability)
+```
+
+# 10. Save results
+
+# 7. Save results
 ```{r save}
-# 9. SAVE RESULTS
 for (name in names(all_results)) {
   res <- all_results[[name]]
   
   write.csv(
     res$cluster_df,
     file = file.path(
-      "output",
-      paste0("pd_clusters_", name, "_k", res$best_k, ".csv")
+      "output/fpdc_results",
+      paste0("fpdc_clusters_", name, "_k", res$best_k, "_q", res$best_q, ".csv")
     ),
     row.names = FALSE
   )
   
   write.csv(
-    res$pd_results,
+    res$results_grid,
     file = file.path(
-      "output",
-      paste0("pd_tuning_results_", name, ".csv")
+      "output/fpdc_results",
+      paste0("fpdc_tuning_results_", name, ".csv")
     ),
     row.names = FALSE
   )
   
   saveRDS(
-    res$best_model,
+    res$best_fpdc,
     file = file.path(
-      "output/pd_cache",
-      paste0("best_pd_", name, "_k", res$best_k, ".rds")
+      "output/fpdc_cache",
+      paste0("best_fpdc_", name, "_k", res$best_k, "_q", res$best_q, ".rds")
+    )
+  )
+  
+  saveRDS(
+    res,
+    file = file.path(
+      "output/fpdc_cache",
+      paste0("fpdc_full_result_", name, ".rds")
     )
   )
 }
+
+write.csv(
+  cluster_df,
+  file = file.path(
+    "output/fpdc_results",
+    paste0("fpdc_best_overall_clusters_", best_name, "_k", best_k, "_q", best_q, ".csv")
+  ),
+  row.names = FALSE
+)
+
+write.csv(
+  best_results_grid,
+  file = file.path(
+    "output/fpdc_results",
+    "fpdc_tuning_results_best_overall.csv"
+  ),
+  row.names = FALSE
+)
 
 ```

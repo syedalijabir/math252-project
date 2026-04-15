@@ -22,7 +22,7 @@ knitr::opts_chunk$set(
 set.seed(42)
 ```
 
-```{r setup}
+```{r libs}
 
 library(readr)
 library(dplyr)
@@ -37,6 +37,7 @@ library(FPDclustering)
 ```{r dirs}
 dir.create("output/fpdc_cache", recursive = TRUE, showWarnings = FALSE)
 dir.create("output/fpdc_plots", recursive = TRUE, showWarnings = FALSE)
+dir.create("output/fpdc_results", recursive = TRUE, showWarnings = FALSE)
 ```
 
 # 1. Embedding files and tuning ranges
@@ -61,6 +62,12 @@ all_results <- list()
 start_time <- Sys.time()
 
 for (embedding_path in embedding_paths) {
+  
+  if (!file.exists(embedding_path)) {
+    cat("Missing file:", embedding_path, "\n")
+    next
+  }
+  
   cat("\nProcessing:", embedding_path, "\n")
   
   embeddings <- read_csv(embedding_path, show_col_types = FALSE)
@@ -71,16 +78,27 @@ for (embedding_path in embedding_paths) {
   
   embedding_tag <- tools::file_path_sans_ext(basename(embedding_path))
   
+  full_cache_file <- file.path(
+    "output/fpdc_cache",
+    paste0("fpdc_full_result_", embedding_tag, ".rds")
+  )
+  
+  # Prefer loading full saved result
+  if (file.exists(full_cache_file)) {
+    cat("Loading full cached result for:", embedding_tag, "\n")
+    all_results[[embedding_tag]] <- readRDS(full_cache_file)
+    next
+  }
+  
   dmat <- dist(embedding_matrix)
   
   results_grid <- expand.grid(k = k_range, q = q_range)
-  
-  total_jobs <- nrow(results_grid)
-  pb <- txtProgressBar(min = 0, max = total_jobs, style = 3)
-  
   results_grid$Silhouette <- NA_real_
   results_grid$CH <- NA_real_
   results_grid$ProbSilh <- NA_real_
+  
+  total_jobs <- nrow(results_grid)
+  pb <- txtProgressBar(min = 0, max = total_jobs, style = 3)
   
   fpdc_models <- vector("list", nrow(results_grid))
   
@@ -109,7 +127,7 @@ for (embedding_path in embedding_paths) {
       model <- FPDC(
         embedding_matrix,
         k_val,
-        20,   # lower iterations for tuning speed
+        20,
         q_val
       )
       
@@ -145,6 +163,7 @@ for (embedding_path in embedding_paths) {
     results_grid$ProbSilh[i] <- prob_sil
     fpdc_models[[i]] <- model
   }
+  
   close(pb)
   
   # Best model: silhouette primary, CH secondary
@@ -171,12 +190,13 @@ for (embedding_path in embedding_paths) {
     best_params = best_params,
     best_k = best_k,
     best_q = best_q,
-    best_fpdc <- best_res$best_model,
-    best_results_grid <- best_res$results_grid,
+    best_fpdc = best_fpdc,
     best_labels = best_labels,
     cluster_df = cluster_df,
     dmat = dmat
   )
+  
+  cat("Finished:", embedding_tag, "\n")
 }
 ```
 
@@ -272,7 +292,7 @@ print(best_overall)
 best_name <- best_overall$embedding
 best_res <- all_results[[best_name]]
 
-best_fpdc <- best_res$best_model
+best_fpdc <- best_res$best_fpdc
 best_params <- best_res$best_params
 best_k <- best_res$best_k
 best_q <- best_res$best_q
@@ -335,28 +355,10 @@ for (name in names(all_results)) {
   cat("Cluster sizes:\n")
   print(table(res$best_labels))
   cat("Probability-based silhouette:\n")
-  print(Silh(res$best_model$probability))
+  print(Silh(res$best_fpdc$probability))
 }
 ```
 
-# 7. Save results
-```{r}
-write.csv(
-  cluster_df,
-  file = file.path(
-    "output",
-    paste0("fpdc_best_overall_clusters_", best_name, "_k", best_k, "_q", best_q, ".csv")
-  ),
-  row.names = FALSE
-)
-
-write.csv(
-  best_results_grid,
-  file = "output/fpdc_tuning_results_best_overall.csv",
-  row.names = FALSE
-)
-
-```
 
 # 8. PCA visualization
 ```{r}
@@ -385,16 +387,63 @@ Silh(best_fpdc$probability)
 ```
 
 # 10. Save results
-```{r}
+
+# 7. Save results
+```{r save}
+for (name in names(all_results)) {
+  res <- all_results[[name]]
+  
+  write.csv(
+    res$cluster_df,
+    file = file.path(
+      "output/fpdc_results",
+      paste0("fpdc_clusters_", name, "_k", res$best_k, "_q", res$best_q, ".csv")
+    ),
+    row.names = FALSE
+  )
+  
+  write.csv(
+    res$results_grid,
+    file = file.path(
+      "output/fpdc_results",
+      paste0("fpdc_tuning_results_", name, ".csv")
+    ),
+    row.names = FALSE
+  )
+  
+  saveRDS(
+    res$best_fpdc,
+    file = file.path(
+      "output/fpdc_cache",
+      paste0("best_fpdc_", name, "_k", res$best_k, "_q", res$best_q, ".rds")
+    )
+  )
+  
+  saveRDS(
+    res,
+    file = file.path(
+      "output/fpdc_cache",
+      paste0("fpdc_full_result_", name, ".rds")
+    )
+  )
+}
+
 write.csv(
   cluster_df,
-  file = paste0("output/fpdc_clusters_k", best_k, "_q", best_q, ".csv"),
+  file = file.path(
+    "output/fpdc_results",
+    paste0("fpdc_best_overall_clusters_", best_name, "_k", best_k, "_q", best_q, ".csv")
+  ),
   row.names = FALSE
 )
 
 write.csv(
   best_results_grid,
-  file = "output/fpdc_tuning_results_best_overall.csv",
+  file = file.path(
+    "output/fpdc_results",
+    "fpdc_tuning_results_best_overall.csv"
+  ),
   row.names = FALSE
 )
+
 ```

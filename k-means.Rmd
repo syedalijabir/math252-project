@@ -59,9 +59,93 @@ all_results <- list()
 
 dir.create("output/kmeans_plots", recursive = TRUE, showWarnings = FALSE)
 dir.create("output/kmeans_cache", recursive = TRUE, showWarnings = FALSE)
+dir.create("output/kmeans_results", recursive = TRUE, showWarnings = FALSE)
 ```
 
+
+
 # 3. Choose Number of Clusters
+```{r load-saved}
+load_kmeans_cached_results <- function(embedding_path) {
+  embeddings <- read_csv(embedding_path, show_col_types = FALSE)
+  
+  user_ids <- embeddings[[1]]
+  embedding_matrix <- embeddings[, -1]
+  embedding_matrix <- scale(as.matrix(embedding_matrix))
+  
+  embedding_tag <- tools::file_path_sans_ext(basename(embedding_path))
+  full_file <- file.path(
+    "output/kmeans_cache", paste0("kmeans_full_result_", 
+                                  embedding_tag, ".rds")
+    )
+
+if (file.exists(full_file)) {
+  all_results[[embedding_tag]] <- readRDS(full_file)
+  next
+}
+  
+  dmat <- dist(embedding_matrix)
+  
+  kmeans_file <- file.path("output/kmeans_cache", paste0("kmeans_result_", embedding_tag, ".rds"))
+  all_file    <- file.path("output/kmeans_cache", paste0("k_results_all_", embedding_tag, ".rds"))
+  mq_file     <- file.path("output/kmeans_cache", paste0("k_results_mq_", embedding_tag, ".rds"))
+  
+  if (!file.exists(kmeans_file) || !file.exists(all_file) || !file.exists(mq_file)) {
+    return(NULL)
+  }
+  
+  kmeans_result <- readRDS(kmeans_file)
+  k_results_all <- readRDS(all_file)
+  k_results_mq  <- readRDS(mq_file)
+  
+  best_k_sil <- k_results_mq$k[which.max(k_results_mq$Silhouette)]
+  best_k_ch  <- k_results_mq$k[which.max(k_results_mq$CH)]
+  
+  elbow_info <- find_elbow_k(k_results_mq$k, k_results_mq$WSS)
+  best_k_elbow <- elbow_info$elbow_k
+  final_k <- kmeans_result$centers |> nrow()
+  
+  cluster_df <- data.frame(
+    UserID = user_ids,
+    Cluster = kmeans_result$cluster
+  )
+  
+  final_sil <- silhouette(kmeans_result$cluster, dmat)
+  final_avg_sil <- mean(final_sil[, 3])
+  
+  pca <- prcomp(embedding_matrix)
+  var_explained <- summary(pca)$importance[2, 1:2]
+  
+  pca_df <- data.frame(
+    PC1 = pca$x[, 1],
+    PC2 = pca$x[, 2],
+    Cluster = as.factor(kmeans_result$cluster)
+  )
+  
+  list(
+    embedding_path = embedding_path,
+    embedding_tag = embedding_tag,
+    embedding_matrix = embedding_matrix,
+    user_ids = user_ids,
+    dmat = dmat,
+    k_results_mq = k_results_mq,
+    k_results_all = k_results_all,
+    best_k_sil = best_k_sil,
+    best_k_ch = best_k_ch,
+    best_k_elbow = best_k_elbow,
+    elbow_distances = elbow_info$distances,
+    final_k = final_k,
+    kmeans_result = kmeans_result,
+    cluster_df = cluster_df,
+    final_sil = final_sil,
+    final_avg_sil = final_avg_sil,
+    pca_df = pca_df,
+    var_explained = var_explained
+  )
+}
+```
+
+
 ```{r eval-funct}
 # KMEANS: CHOOSE NUMBER OF CLUSTERS
 #* We evaluate k = 2 to 20 using:
@@ -74,6 +158,8 @@ dir.create("output/kmeans_cache", recursive = TRUE, showWarnings = FALSE)
 # - WSS (elbow method)
 # - average silhouette width
 # - Calinski-Harabasz (CH) index
+
+
 
 evaluate_kmeans <- function(x, k_vals, dmat, algorithm = "Hartigan-Wong",
                             nstart = 10, iter.max = 100) {
@@ -159,12 +245,26 @@ for (embedding_path in embedding_paths) {
   cat("\nProcessing:", embedding_path, "\n")
   
   embeddings <- read_csv(embedding_path, show_col_types = FALSE)
-  
   user_ids <- embeddings[[1]]
   embedding_matrix <- embeddings[, -1]
   embedding_matrix <- scale(as.matrix(embedding_matrix))
   
   embedding_tag <- tools::file_path_sans_ext(basename(embedding_path))
+  
+  kmeans_file <- file.path("output/kmeans_cache", paste0("kmeans_result_", embedding_tag, ".rds"))
+  all_file    <- file.path("output/kmeans_cache", paste0("k_results_all_", embedding_tag, ".rds"))
+  mq_file     <- file.path("output/kmeans_cache", paste0("k_results_mq_", embedding_tag, ".rds"))
+  
+  if (file.exists(kmeans_file) && file.exists(all_file) && file.exists(mq_file)) {
+    cat("Loading cached results for:", embedding_tag, "\n")
+    
+    cached_res <- load_kmeans_cached_results(embedding_path)
+    all_results[[embedding_tag]] <- cached_res
+    next
+  }
+  
+  cat("Running k-means for:", embedding_tag, "\n")
+  
   dmat <- dist(embedding_matrix)
   
   k_results_hw <- evaluate_kmeans(embedding_matrix, k_vals, dmat, "Hartigan-Wong")
@@ -175,14 +275,11 @@ for (embedding_path in embedding_paths) {
   
   best_k_sil <- k_results_mq$k[which.max(k_results_mq$Silhouette)]
   best_k_ch  <- k_results_mq$k[which.max(k_results_mq$CH)]
-
+  
   elbow_info <- find_elbow_k(k_results_mq$k, k_results_mq$WSS)
   best_k_elbow <- elbow_info$elbow_k
-
-# Use elbow as the primary selection rule
-final_k <- best_k_elbow
+  final_k <- best_k_elbow
   
-
   set.seed(123)
   kmeans_result <- kmeans(
     embedding_matrix,
@@ -210,8 +307,11 @@ final_k <- best_k_elbow
   )
   
   all_results[[embedding_tag]] <- list(
-    embedding_path = embedding_path, embedding_tag = embedding_tag, 
-    embedding_matrix = embedding_matrix, user_ids = user_ids, dmat = dmat,
+    embedding_path = embedding_path,
+    embedding_tag = embedding_tag,
+    embedding_matrix = embedding_matrix,
+    user_ids = user_ids,
+    dmat = dmat,
     k_results_hw = k_results_hw,
     k_results_lloyd = k_results_lloyd,
     k_results_mq = k_results_mq,
@@ -227,10 +327,11 @@ final_k <- best_k_elbow
     final_avg_sil = final_avg_sil,
     pca_df = pca_df,
     var_explained = var_explained
-    )
+  )
   
   cat("Saved results for:", embedding_tag, "\n")
 }
+
 ```
 # 5. Show results for all embeddings
 ```{r results}
@@ -354,26 +455,22 @@ best_final_k <- best_res$final_k
 
 # 9. Save per-embedding results
 ```{r save}
-####################### 11. SAVE RESULTS #######################
+#### 11. SAVE RESULTS #####
 
 for (name in names(all_results)) {
   res <- all_results[[name]]
   
   write.csv(
-    res$cluster_df,
-    file = file.path("output", paste0("kmeans_clusters_", name, "_k", res$final_k, ".csv")),
-    row.names = FALSE
-  )
-  
+    res$cluster_df,  file = file.path("output/kmeans_results", paste0("kmeans_clusters_", name, "_k", res$final_k, ".csv")), row.names = FALSE
+    )
+
   write.csv(
-    res$k_results_all,
-    file = file.path("output", paste0("kmeans_k_selection_metrics_all_", name, ".csv")),
-    row.names = FALSE
-  )
-  
+    res$k_results_all, file = file.path("output/kmeans_results",  paste0("kmeans_k_selection_metrics_all_", name, ".csv")), row.names = FALSE
+    )
+
   write.csv(
     res$k_results_mq,
-    file = file.path("output", paste0("kmeans_k_selection_metrics_macqueen_", name, ".csv")),
+    file = file.path("output/kmeans_results", paste0("kmeans_k_selection_metrics_macqueen_", name, ".csv")),
     row.names = FALSE
   )
   
@@ -391,6 +488,21 @@ for (name in names(all_results)) {
     res$k_results_mq,
     file = file.path("output/kmeans_cache", paste0("k_results_mq_", name, ".rds"))
   )
+  
+  saveRDS(
+  res$k_results_hw,
+  file = file.path("output/kmeans_cache", paste0("k_results_hw_", name, ".rds"))
+)
+
+saveRDS(
+  res$k_results_lloyd,
+  file = file.path("output/kmeans_cache", paste0("k_results_lloyd_", name, ".rds"))
+)
+  
+  saveRDS(
+    res, file = file.path("output/kmeans_cache", paste0("kmeans_full_result_", name, ".rds"))
+    )
+  
 }
 
 ```
