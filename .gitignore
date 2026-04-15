@@ -4,4 +4,8 @@
 .Ruserdata
 
 output/knit-cache
+output/pd_cache
+ouptut/kmeans_cache
+ouptut/fpdc_cache
+ouptut/ArchivedResults
 data/ml-1m.zip
