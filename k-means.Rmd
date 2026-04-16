@@ -1,5 +1,5 @@
 ---
-title: "MovieLens 1M: Clustering the Embeddings"
+title: "MovieLens 1M: K-means Clustering the Embeddings"
 author: ""
 date: "`r format(Sys.Date())`"
 output:
@@ -168,25 +168,47 @@ load_kmeans_cached_results <- function(embedding_path) {
 # - Calinski-Harabasz (CH) index
 
 
-
 evaluate_kmeans <- function(x, k_vals, dmat, algorithm = "Hartigan-Wong",
                             nstart = 10, iter.max = 100) {
   
   wss <- numeric(length(k_vals))
   sil_scores <- numeric(length(k_vals))
   ch_scores <- numeric(length(k_vals))
+  runtime_sec <- numeric(length(k_vals))
+  status <- rep("ok", length(k_vals))
+  notes <- rep(NA_character_, length(k_vals))
+  
+  models <- vector("list", length(k_vals))
   
   for (i in seq_along(k_vals)) {
     k <- k_vals[i]
+    t0 <- Sys.time()
     
-    km <- kmeans(
-      x,
-      centers = k,
-      nstart = nstart,
-      iter.max = iter.max,
-      algorithm = algorithm
+    km <- tryCatch(
+      kmeans(
+        x,
+        centers = k,
+        nstart = nstart,
+        iter.max = iter.max,
+        algorithm = algorithm
+      ),
+      warning = function(w) {
+        status[i] <<- "warning"
+        notes[i] <<- conditionMessage(w)
+        invokeRestart("muffleWarning")
+      },
+      error = function(e) {
+        status[i] <<- "error"
+        notes[i] <<- conditionMessage(e)
+        NULL
+      }
     )
     
+    runtime_sec[i] <- as.numeric(difftime(Sys.time(), t0, units = "secs"))
+    
+    if (is.null(km)) next
+    
+    models[[i]] <- km
     wss[i] <- km$tot.withinss
     
     sil <- silhouette(km$cluster, dmat)
@@ -204,8 +226,13 @@ evaluate_kmeans <- function(x, k_vals, dmat, algorithm = "Hartigan-Wong",
     k = k_vals,
     WSS = wss,
     Silhouette = sil_scores,
-    CH = ch_scores
-  )
+    CH = ch_scores,
+    runtime_sec = runtime_sec,
+    status = status,
+    notes = notes
+  ) |>
+    dplyr::mutate(model_index = seq_along(k_vals)) |>
+    list(metrics = _, models = models)
 }
 
 # Detect elbow from WSS curve using maximum distance to the line
@@ -251,6 +278,7 @@ for (embedding_path in embedding_paths) {
   }
   
   cat("\nProcessing:", embedding_path, "\n")
+  embedding_t0 <- Sys.time()
   
   embeddings <- read_csv(embedding_path, show_col_types = FALSE)
   user_ids <- embeddings[[1]]
@@ -276,12 +304,21 @@ for (embedding_path in embedding_paths) {
   
   dmat <- dist(embedding_matrix)
   
-  k_results_hw <- evaluate_kmeans(embedding_matrix, k_vals, dmat, "Hartigan-Wong")
-  k_results_lloyd <- evaluate_kmeans(embedding_matrix, k_vals, dmat, "Lloyd")
-  k_results_mq <- evaluate_kmeans(embedding_matrix, k_vals, dmat, "MacQueen")
+  embedding_t0 <- Sys.time()
+  k_eval_hw <- evaluate_kmeans(embedding_matrix, k_vals, dmat, "Hartigan-Wong")
+  k_eval_lloyd <- evaluate_kmeans(embedding_matrix, k_vals, dmat, "Lloyd")
+  k_eval_mq <- evaluate_kmeans(embedding_matrix, k_vals, dmat, "MacQueen")
+
+  k_results_hw <- k_eval_hw$metrics
+  k_results_lloyd <- k_eval_lloyd$metrics
+  k_results_mq <- k_eval_mq$metrics
+  
+  k_models_hw <- k_eval_hw$models
+  k_models_lloyd <- k_eval_lloyd$models
+  k_models_mq <- k_eval_mq$models
   
   k_results_all <- bind_rows(k_results_hw, k_results_lloyd, k_results_mq)
-  
+    
   best_k_sil <- k_results_mq$k[which.max(k_results_mq$Silhouette)]
   best_k_ch  <- k_results_mq$k[which.max(k_results_mq$CH)]
   
@@ -315,12 +352,41 @@ for (embedding_path in embedding_paths) {
     Cluster = as.factor(kmeans_result$cluster)
   )
   
+  runtime_total_sec <- as.numeric(difftime(Sys.time(), embedding_t0, units = "secs"))
+  
+  cluster_sizes <- table(cluster_df$Cluster)
+
+  notes_text <- NA_character_
+  if ("notes" %in% names(k_results_all)) {
+    tmp_notes <- unique(na.omit(k_results_all$notes))
+    if (length(tmp_notes) > 0) {
+      notes_text <- paste(tmp_notes, collapse = " | ")
+    }
+  }
+  
+  summary_row <- data.frame(
+    method = "kmeans",
+    embedding = embedding_tag,
+    best_k = final_k,
+    best_q = NA,
+    silhouette = final_avg_sil,
+    CH = k_results_mq$CH[which.max(k_results_mq$Silhouette)],
+    prob_silh = NA,
+    cluster_size_min = min(cluster_sizes),
+    cluster_size_max = max(cluster_sizes),
+    cluster_size_sd = sd(as.numeric(cluster_sizes)),
+    runtime_total_sec = runtime_total_sec,
+    notes = notes_text
+  )
   all_results[[embedding_tag]] <- list(
     embedding_path = embedding_path,
     embedding_tag = embedding_tag,
     embedding_matrix = embedding_matrix,
     user_ids = user_ids,
     dmat = dmat,
+    k_models_hw = k_models_hw,
+    k_models_lloyd = k_models_lloyd,
+    k_models_mq = k_models_mq,
     k_results_hw = k_results_hw,
     k_results_lloyd = k_results_lloyd,
     k_results_mq = k_results_mq,
@@ -335,7 +401,18 @@ for (embedding_path in embedding_paths) {
     final_sil = final_sil,
     final_avg_sil = final_avg_sil,
     pca_df = pca_df,
-    var_explained = var_explained
+    var_explained = var_explained,
+    runtime_total_sec = runtime_total_sec,
+    summary_row = summary_row,
+    stability_info = list(
+      seeds_tested = NA,
+      n_runs = NA,
+      chosen_k_values = NA,
+      chosen_q_values = NA,
+      ari_mean = NA,
+      ari_sd = NA,
+      stability_notes = NA_character_
+    )
   )
   
   cat("Saved results for:", embedding_tag, "\n")
@@ -483,6 +560,14 @@ for (name in names(all_results)) {
     row.names = FALSE
   )
   
+  all_summary_df <- bind_rows(lapply(all_results, function(x) x$summary_row))
+
+write.csv(
+  all_summary_df,
+  file = file.path("output/kmeans_results", "kmeans_summary_table.csv"),
+  row.names = FALSE
+)
+
   saveRDS(
     res$kmeans_result,
     file = file.path("output/kmeans_cache", paste0("kmeans_result_", name, ".rds"))
@@ -494,25 +579,35 @@ for (name in names(all_results)) {
   )
   
   saveRDS(
-    res$k_results_mq,
-    file = file.path("output/kmeans_cache", paste0("k_results_mq_", name, ".rds"))
+  k_models_hw,
+  file = file.path("output/kmeans_cache", paste0("k_models_hw_", embedding_tag, ".rds"))
   )
   
   saveRDS(
-  res$k_results_hw,
-  file = file.path("output/kmeans_cache", paste0("k_results_hw_", name, ".rds"))
-)
-
-saveRDS(
-  res$k_results_lloyd,
-  file = file.path("output/kmeans_cache", paste0("k_results_lloyd_", name, ".rds"))
-)
+    k_models_lloyd,
+    file = file.path("output/kmeans_cache", paste0("k_models_lloyd_", embedding_tag, ".rds"))
+  )
+  
+  saveRDS(
+    k_models_mq,
+    file = file.path("output/kmeans_cache", paste0("k_models_mq_", embedding_tag, ".rds"))
+  )
   
   saveRDS(
     res, file = file.path("output/kmeans_cache", paste0("kmeans_full_result_", name, ".rds"))
     )
   
+  
+  
 }
+
+all_summary_df <- bind_rows(lapply(all_results, function(x) x$summary_row))
+
+write.csv(
+  all_summary_df,
+  file = file.path("output/kmeans_results", "kmeans_summary_table.csv"),
+  row.names = FALSE
+)
 
 ```
 
