@@ -11,3 +11,8 @@ ouptut/kmeans_cache
 ouptut/fpdc_cache
 ouptut/ArchivedResults
 data/ml-1m.zip
+rkm_files/
+km_files/
+pd_files/
+fpdc_files/
+output/
