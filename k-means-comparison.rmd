@@ -1,0 +1,264 @@
+```{r ari-comparison-between-kmeans-and-rkm}
+required_packages <- c(
+  "readr", "dplyr", "mclust"
+)
+
+installed <- rownames(installed.packages())
+missing_pkgs <- setdiff(required_packages, installed)
+
+if (length(missing_pkgs) > 0) {
+  install.packages(missing_pkgs)
+}
+
+library(readr)
+library(dplyr)
+library(mclust)
+```
+
+```{r settings}
+set.seed(123)
+
+# ------------------------------------------------------------
+# SETTINGS
+# ------------------------------------------------------------
+embedding_paths <- c(
+  "output/embeddings/user_embeddings_64.csv",
+  "output/embeddings/user_embeddings_128.csv",
+  "output/embeddings/user_embeddings_256.csv"
+)
+
+k_to_compare <- c(3,4, 5,6, 7,8, 9,10)
+q_range <- 2:6
+
+dir.create("output/ari_results", recursive = TRUE, showWarnings = FALSE)
+```
+
+```{r helpers}
+# ------------------------------------------------------------
+# HELPERS
+# ------------------------------------------------------------
+
+# Load best cached RKM result for a given embedding_tag and k
+load_best_rkm_for_k <- function(embedding_tag, k_val, q_vals = 2:6,
+                                cache_dir = "output/rkm_cache") {
+  
+  candidates <- list()
+  
+  for (q_val in q_vals) {
+    cache_file <- file.path(
+      cache_dir,
+      paste0("rkm_", embedding_tag, "_k", k_val, "_q", q_val, ".rds")
+    )
+    
+    if (file.exists(cache_file)) {
+      cached <- readRDS(cache_file)
+      
+      candidates[[length(candidates) + 1]] <- list(
+        k = k_val,
+        q = q_val,
+        asw = cached$asw,
+        model = cached$model,
+        file = cache_file
+      )
+    }
+  }
+  
+  if (length(candidates) == 0) {
+    return(NULL)
+  }
+  
+  asw_vals <- sapply(candidates, function(x) x$asw)
+  best_idx <- which.max(asw_vals)
+  candidates[[best_idx]]
+}
+
+# Standard k-means for a fixed k
+run_kmeans_for_k <- function(x, k_val,
+                             nstart = 100,
+                             iter.max = 100,
+                             algorithm = "MacQueen",
+                             scale_data = TRUE) {
+  
+  if (scale_data) {
+    x <- scale(x)
+  }
+  
+  km <- kmeans(
+    x,
+    centers = k_val,
+    nstart = nstart,
+    iter.max = iter.max,
+    algorithm = algorithm
+  )
+  
+  km
+}
+```
+
+```{r compare}
+# ------------------------------------------------------------
+# MAIN COMPARISON
+# ------------------------------------------------------------
+
+set.seed(123)
+
+ari_results <- list()
+
+for (embedding_path in embedding_paths) {
+  
+  if (!file.exists(embedding_path)) {
+    cat("Missing embedding file:", embedding_path, "\n")
+    next
+  }
+  
+  cat("\nProcessing:", embedding_path, "\n")
+  
+  embeddings <- read_csv(embedding_path, show_col_types = FALSE)
+  
+  user_ids <- embeddings[[1]]
+  embedding_matrix <- embeddings[, -1] |> as.matrix()
+  
+  embedding_tag <- tools::file_path_sans_ext(basename(embedding_path))
+  
+  for (k_val in k_to_compare) {
+    cat("  Comparing k =", k_val, "for", embedding_tag, "\n")
+    
+    # Load best cached RKM model for this k
+    best_rkm <- load_best_rkm_for_k(
+      embedding_tag = embedding_tag,
+      k_val = k_val,
+      q_vals = q_range,
+      cache_dir = "output/rkm_cache"
+    )
+    
+    if (is.null(best_rkm)) {
+      cat("    No cached RKM files found for k =", k_val, "\n")
+      next
+    }
+    
+    # Run standard k-means for the same k
+    km_model <- run_kmeans_for_k(
+      x = embedding_matrix,
+      k_val = k_val,
+      nstart = 100,
+      iter.max = 100,
+      algorithm = "Hartigan-Wong",
+      scale_data = TRUE
+    )
+    
+    # Extract assignments
+    kmeans_cluster <- km_model$cluster
+    rkm_cluster <- best_rkm$model$cluster
+    
+    # Sanity check
+    if (length(kmeans_cluster) != length(rkm_cluster)) {
+      cat("    Cluster length mismatch for", embedding_tag, "k =", k_val, "\n")
+      next
+    }
+    
+    # Compute ARI
+    ari_val <- adjustedRandIndex(kmeans_cluster, rkm_cluster)
+    
+    # Store per-user assignments too if you want
+    assignment_df <- data.frame(
+      UserID = user_ids,
+      KMeans_Cluster = kmeans_cluster,
+      RKM_Cluster = rkm_cluster
+    )
+    
+    write.csv(
+      assignment_df,
+      file = file.path(
+        "output/ari_results",
+        paste0("cluster_assignment_compare_", embedding_tag, "_k", k_val, ".csv")
+      ),
+      row.names = FALSE
+    )
+    
+    # Summary row
+    ari_results[[length(ari_results) + 1]] <- data.frame(
+      embedding = embedding_tag,
+      k = k_val,
+      rkm_best_q = best_rkm$q,
+      rkm_best_asw = best_rkm$asw,
+      ari = ari_val,
+      kmeans_cluster_sizes = paste(as.integer(table(kmeans_cluster)), collapse = "|"),
+      rkm_cluster_sizes = paste(as.integer(table(rkm_cluster)), collapse = "|"),
+      stringsAsFactors = FALSE
+    )
+  }
+}
+```
+
+```{r final}
+# ------------------------------------------------------------
+# FINAL TABLE
+# ------------------------------------------------------------
+
+ari_results_df <- bind_rows(ari_results) %>%
+  arrange(embedding, k)
+
+print(ari_results_df)
+
+write.csv(
+  ari_results_df,
+  file = "output/ari_results/ari_kmeans_vs_rkm_summary.csv",
+  row.names = FALSE
+)
+```
+
+```{r plot}
+embedding_path <- "output/embeddings/user_embeddings_128.csv"
+selected_k <- 5
+
+embeddings <- read_csv(embedding_path, show_col_types = FALSE)
+
+user_ids <- embeddings[[1]]
+embedding_matrix <- embeddings[, -1] |> as.matrix()
+
+embedding_tag <- tools::file_path_sans_ext(basename(embedding_path))
+
+# scale the data for k-means + PCA
+x_scaled <- scale(embedding_matrix)
+pca <- prcomp(x_scaled)
+
+plot_df <- data.frame(
+  UserID = user_ids,
+  PC1 = pca$x[, 1],
+  PC2 = pca$x[, 2],
+  KMeans = factor(km_model$cluster),
+  RKM = factor(rkm_models[[selected_k]]$cluster)
+)
+
+var_explained <- summary(pca)$importance[2, 1:2]
+
+# ------------------------------------------------------------
+# PLOT SIDE BY SIDE
+# ------------------------------------------------------------
+library(ggplot2)
+library(patchwork)
+p_kmeans <- ggplot(plot_df, aes(x = PC1, y = PC2, color = KMeans)) +
+  geom_point(alpha = 0.65, size = 1.8) +
+  theme_minimal() +
+  labs(
+    title = paste("K-means:", embedding_tag, "(k =", selected_k, ")"),
+    x = paste0("PC1 (", round(100 * var_explained[1], 1), "%)"),
+    y = paste0("PC2 (", round(100 * var_explained[2], 1), "%)"),
+    color = "Cluster"
+  )
+
+p_rkm <- ggplot(plot_df, aes(x = PC1, y = PC2, color = RKM)) +
+  geom_point(alpha = 0.65, size = 1.8) +
+  theme_minimal() +
+  labs(
+    title = paste("Reduced K-means:", embedding_tag,
+                  "(k =", selected_k, ", q =", best_rkm$q, ")"),
+    x = paste0("PC1 (", round(100 * var_explained[1], 1), "%)"),
+    y = paste0("PC2 (", round(100 * var_explained[2], 1), "%)"),
+    color = "Cluster"
+  )
+
+combined_plot <- p_kmeans + p_rkm + plot_layout(ncol = 2)
+
+plot(combined_plot)
+```
