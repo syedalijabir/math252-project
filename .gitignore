@@ -5,6 +5,7 @@
 
 *.pdf
 
+output/
 output/knit-cache
 output/pd_cache
 ouptut/kmeans_cache
