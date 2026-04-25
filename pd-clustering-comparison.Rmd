@@ -1,0 +1,266 @@
+```{r ari-pd-vs-fpdc}
+required_packages <- c("readr", "dplyr", "mclust")
+installed <- rownames(installed.packages())
+missing_pkgs <- setdiff(required_packages, installed)
+
+if (length(missing_pkgs) > 0) {
+  install.packages(missing_pkgs)
+}
+
+library(readr)
+library(dplyr)
+library(mclust)
+```
+
+```{r settings}
+# ------------------------------------------------------------
+# SETTINGS
+# ------------------------------------------------------------
+embedding_paths <- c(
+  "output/embeddings/user_embeddings_64.csv",
+  "output/embeddings/user_embeddings_128.csv",
+  "output/embeddings/user_embeddings_256.csv"
+)
+
+k_to_compare <- c(2, 3, 4, 5)   # FPDC was only cached for k = 2:5
+q_range <- 2:4                  # FPDC q-range from your code
+
+dir.create("output/pd_fpdc_ari_results", recursive = TRUE, showWarnings = FALSE)
+```
+
+```{r helpers}
+# ------------------------------------------------------------
+# HELPERS
+# ------------------------------------------------------------
+
+# Load cached PD result for one embedding and k
+load_cached_pd_for_k <- function(embedding_tag, k_val,
+                                 cache_dir = "output/pd_cache") {
+  
+  cache_file <- file.path(
+    cache_dir,
+    paste0("pd_", embedding_tag, "_k", k_val, ".rds")
+  )
+  
+  if (!file.exists(cache_file)) {
+    return(NULL)
+  }
+  
+  readRDS(cache_file)
+}
+
+# Load best cached FPDC result for one embedding and k
+# By default: choose highest Silhouette, then CH as tiebreaker
+load_best_cached_fpdc_for_k <- function(embedding_tag, k_val, q_vals = 2:4,
+                                        cache_dir = "output/fpdc_cache") {
+  
+  candidates <- list()
+  
+  for (q_val in q_vals) {
+    cache_file <- file.path(
+      cache_dir,
+      paste0("fpdc_", embedding_tag, "_k", k_val, "_q", q_val, ".rds")
+    )
+    
+    if (file.exists(cache_file)) {
+      cached <- readRDS(cache_file)
+      
+      candidates[[length(candidates) + 1]] <- list(
+        k = k_val,
+        q = q_val,
+        model = cached$model,
+        silhouette = cached$Silhouette,
+        ch = cached$CH,
+        prob_silh = cached$ProbSilh,
+        file = cache_file
+      )
+    }
+  }
+  
+  if (length(candidates) == 0) {
+    return(NULL)
+  }
+  
+  candidate_df <- bind_rows(lapply(candidates, function(x) {
+    data.frame(
+      q = x$q,
+      Silhouette = x$silhouette,
+      CH = x$ch,
+      ProbSilh = x$prob_silh
+    )
+  }))
+  
+  best_idx <- with(candidate_df, order(-Silhouette, -CH))[1]
+  candidates[[best_idx]]
+}
+```
+
+```{r main}
+# ------------------------------------------------------------
+# MAIN LOOP
+# ------------------------------------------------------------
+
+ari_results <- list()
+
+for (embedding_path in embedding_paths) {
+  
+  if (!file.exists(embedding_path)) {
+    cat("Missing embedding file:", embedding_path, "\n")
+    next
+  }
+  
+  embedding_tag <- tools::file_path_sans_ext(basename(embedding_path))
+  cat("\nProcessing:", embedding_tag, "\n")
+  
+  for (k_val in k_to_compare) {
+    cat("  Comparing PD vs FPDC for k =", k_val, "\n")
+    
+    # ----------------------------
+    # Load PD
+    # ----------------------------
+    pd_cached <- load_cached_pd_for_k(
+      embedding_tag = embedding_tag,
+      k_val = k_val,
+      cache_dir = "output/pd_cache"
+    )
+    
+    if (is.null(pd_cached)) {
+      cat("    Missing PD cache for k =", k_val, "\n")
+      next
+    }
+    
+    # ----------------------------
+    # Load best FPDC for same k
+    # ----------------------------
+    fpdc_cached <- load_best_cached_fpdc_for_k(
+      embedding_tag = embedding_tag,
+      k_val = k_val,
+      q_vals = q_range,
+      cache_dir = "output/fpdc_cache"
+    )
+    
+    if (is.null(fpdc_cached)) {
+      cat("    Missing FPDC cache for k =", k_val, "\n")
+      next
+    }
+    
+    # ----------------------------
+    # Extract labels
+    # ----------------------------
+    pd_labels <- pd_cached$labels
+    fpdc_labels <- fpdc_cached$model$label
+    
+    if (length(pd_labels) != length(fpdc_labels)) {
+      cat("    Label length mismatch for", embedding_tag, "k =", k_val, "\n")
+      next
+    }
+    
+    # ----------------------------
+    # Compute ARI
+    # ----------------------------
+    ari_val <- adjustedRandIndex(pd_labels, fpdc_labels)
+    
+    ari_results[[length(ari_results) + 1]] <- data.frame(
+      embedding = embedding_tag,
+      k = k_val,
+      fpdc_best_q = fpdc_cached$q,
+      pd_silhouette = pd_cached$avg_silhouette,
+      pd_ch = pd_cached$ch,
+      pd_prob_silh = pd_cached$prob_silh,
+      fpdc_silhouette = fpdc_cached$silhouette,
+      fpdc_ch = fpdc_cached$ch,
+      fpdc_prob_silh = fpdc_cached$prob_silh,
+      ari = ari_val,
+      pd_cluster_sizes = paste(as.integer(table(pd_labels)), collapse = "|"),
+      fpdc_cluster_sizes = paste(as.integer(table(fpdc_labels)), collapse = "|"),
+      stringsAsFactors = FALSE
+    )
+  }
+}
+```
+
+```{r final}
+# ------------------------------------------------------------
+# FINAL TABLE
+# ------------------------------------------------------------
+ari_results_df <- bind_rows(ari_results) %>%
+  arrange(embedding, k)
+
+print(ari_results_df)
+
+write.csv(
+  ari_results_df,
+  file = file.path("output/pd_fpdc_ari_results", "ari_pd_vs_fpdc_summary.csv"),
+  row.names = FALSE
+)
+```
+
+```{r pd-fpdc-contingency-table}
+library(readr)
+library(dplyr)
+
+# -------------------------------
+# SETTINGS
+# -------------------------------
+embedding_tag <- "user_embeddings_128"   # change as needed
+k_val <- 3                               # change as needed
+q_range <- 2:4
+
+# -------------------------------
+# HELPERS
+# -------------------------------
+
+load_pd_labels <- function(embedding_tag, k_val) {
+  file <- file.path("output/pd_cache",
+                    paste0("pd_", embedding_tag, "_k", k_val, ".rds"))
+  if (!file.exists(file)) stop("Missing PD cache")
+  readRDS(file)$labels
+}
+
+load_best_fpdc_labels <- function(embedding_tag, k_val, q_vals = 2:4) {
+  candidates <- list()
+  
+  for (q_val in q_vals) {
+    file <- file.path("output/fpdc_cache",
+                      paste0("fpdc_", embedding_tag, "_k", k_val, "_q", q_val, ".rds"))
+    
+    if (file.exists(file)) {
+      cached <- readRDS(file)
+      candidates[[length(candidates) + 1]] <- list(
+        q = q_val,
+        sil = cached$Silhouette,
+        ch = cached$CH,
+        labels = cached$model$label
+      )
+    }
+  }
+  
+  if (length(candidates) == 0) stop("No FPDC cache found")
+  
+  df <- bind_rows(lapply(candidates, function(x) {
+    data.frame(q = x$q, Silhouette = x$sil, CH = x$ch)
+  }))
+  
+  best_idx <- with(df, order(-Silhouette, -CH))[1]
+  candidates[[best_idx]]$labels
+}
+
+# -------------------------------
+# LOAD LABELS
+# -------------------------------
+pd_labels <- load_pd_labels(embedding_tag, k_val)
+fpdc_labels <- load_best_fpdc_labels(embedding_tag, k_val, q_range)
+
+# -------------------------------
+# BUILD CONTINGENCY TABLE
+# -------------------------------
+cont_table <- table(
+  PD = factor(pd_labels),
+  FPDC = factor(fpdc_labels)
+)
+
+# -------------------------------
+# PRINT TABLE
+# -------------------------------
+cont_table
+```
