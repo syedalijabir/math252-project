@@ -67,7 +67,7 @@ embedding_paths <- c(
 
 # k values to compare; constrained to what was cached by the FPDC notebook
 k_to_compare <- c(2, 3, 4, 5)   # FPDC was only cached for k = 2:5
-q_range      <- 2:4              # FPDC q-range from the clustering notebook
+q_range      <- 2:4             # FPDC q-range from the clustering notebook
 
 dir.create("output/pd_fpdc_ari_results", recursive = TRUE, showWarnings = FALSE)
 ```
