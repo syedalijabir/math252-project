@@ -1,3 +1,8 @@
+---
+output:
+  pdf_document: default
+  html_document: default
+---
 ```{r ari-pd-vs-fpdc}
 required_packages <- c("readr", "dplyr", "mclust")
 installed <- rownames(installed.packages())

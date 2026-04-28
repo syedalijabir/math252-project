@@ -1,0 +1,656 @@
+---
+title: "MovieLens 1M: Factorial PD Clustering the Embeddings"
+author: ""
+date: "`r format(Sys.Date())`"
+output:
+  pdf_document:
+    toc: true
+    number_sections: true
+fontsize: 11pt
+geometry: margin=1in
+---
+
+<!--
+================================================================================
+  GOAL
+  ----
+  Apply Factorial Probabilistic Distance (FPDC) clustering to user embedding
+  vectors derived from the MovieLens 1M dataset. User embeddings are available
+  at three dimensionalities (64, 128, 256). For each embedding, this notebook
+  performs a grid search over the number of clusters (k) and the factor
+  dimension (q), selects the best (k, q) combination via Average Silhouette
+  Width (with Calinski-Harabasz as a tiebreaker), and saves cluster assignments
+  plus all intermediate results for downstream comparison.
+
+  HOW IT WORKS
+  ------------
+  1. Setup      – Load libraries, create output directories, define the
+                  embedding file paths and the (k, q) search grid.
+  2. Fit/Cache  – For every (embedding, k, q) triple:
+                    a. Check whether a cached .rds result already exists; if
+                       so, skip the FPDC call entirely to avoid re-running
+                       expensive fits.
+                    b. Otherwise run FPDC(), compute Silhouette, CH, and the
+                       probability-based silhouette (ProbSilh), then save to
+                       cache.
+  3. Select     – Within each embedding, pick the (k, q) pair with the highest
+                  Silhouette score; break ties with CH.
+  4. Visualize  – Plot Silhouette, CH, and ProbSilh tuning curves (line plots
+                  over q, colored by k) and PCA projections of the best
+                  cluster assignments. All plots are saved to disk.
+  5. Save       – Write cluster assignment CSVs, tuning result CSVs, and
+                  serialised model objects (.rds) for each embedding.
+================================================================================
+-->
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  warning = FALSE,
+  message = FALSE,
+  fig.width = 9,
+  fig.height = 6,
+  dpi = 120
+)
+set.seed(42)  # Ensures reproducibility across all random operations
+```
+
+```{r libs}
+# Core data wrangling and visualisation
+library(readr)
+library(dplyr)
+library(ggplot2)
+
+# Clustering algorithms and evaluation metrics
+library(cluster)        # silhouette()
+library(factoextra)     # fviz_* helpers (available if needed for later plots)
+library(clusterCrit)    # intCriteria() for Calinski-Harabasz
+library(FPDclustering)  # FPDC() and Silh() – the main algorithm
+```
+
+# Create cached and plot folders
+```{r dirs}
+# Create all output subdirectories upfront so downstream write steps never fail
+dir.create("output/fpdc_cache",   recursive = TRUE, showWarnings = FALSE)
+dir.create("output/fpdc_plots",   recursive = TRUE, showWarnings = FALSE)
+dir.create("output/fpdc_results", recursive = TRUE, showWarnings = FALSE)
+```
+
+# 1. Embedding files and tuning ranges
+```{r load}
+# Paths to the three pre-computed user embedding CSV files (one per dimension)
+embedding_paths <- c(
+  "output/embeddings/user_embeddings_64.csv",
+  "output/embeddings/user_embeddings_128.csv",
+  "output/embeddings/user_embeddings_256.csv"
+)
+
+# Search grid for number of clusters (k) and FPDC factor dimension (q).
+# A smaller grid (commented out below) can be used for faster prototyping.
+#k_range <- 2:5
+#q_range <- 2:4
+
+# Full grid – use when compute budget allows
+k_range <- 2:8
+q_range <- 2:5
+
+# Master list that will accumulate per-embedding results throughout the notebook
+all_results <- list()
+
+# Additional output directories for PD (Probabilistic Distance) results,
+# used when comparing FPDC against the PD baseline in a separate notebook
+dir.create("output/pd_cache",   recursive = TRUE, showWarnings = FALSE)
+dir.create("output/pd_plots",   recursive = TRUE, showWarnings = FALSE)
+dir.create("output/pd_results", recursive = TRUE, showWarnings = FALSE)
+```
+
+
+# 2 Fit embeddings with caching
+```{r run-fpdc}
+# ── Outer loop: iterate over each embedding dimensionality ───────────────────
+start_time <- Sys.time()
+
+for (embedding_path in embedding_paths) {
+
+  embedding_t0 <- Sys.time()
+
+  if (!file.exists(embedding_path)) {
+    cat("Missing file:", embedding_path, "\n")
+    next
+  }
+
+  cat("\nProcessing:", embedding_path, "\n")
+  embedding_t0 <- Sys.time()
+
+  # Load embedding CSV; first column is UserID, remaining columns are features
+  embeddings <- read_csv(embedding_path, show_col_types = FALSE)
+
+  user_ids         <- embeddings[[1]]
+  embedding_matrix <- embeddings[, -1]
+  # Z-score each feature column so all dimensions contribute equally to distance
+  embedding_matrix <- scale(as.matrix(embedding_matrix))
+
+  # Derive a short tag from the filename (e.g. "user_embeddings_128") for use
+  # in cache filenames and plot titles
+  embedding_tag <- tools::file_path_sans_ext(basename(embedding_path))
+
+  # Path for the full serialised result (bypasses the inner (k,q) loop entirely)
+  full_cache_file <- file.path(
+    "output/fpdc_cache",
+    paste0("fpdc_full_result_", embedding_tag, ".rds")
+  )
+
+  # If a complete result for this embedding already exists, load and skip
+  if (file.exists(full_cache_file)) {
+    cat("Loading full cached result for:", embedding_tag, "\n")
+    all_results[[embedding_tag]] <- readRDS(full_cache_file)
+    next
+  }
+
+  # Precompute the distance matrix once; reused for every silhouette call below
+  dmat <- dist(embedding_matrix)
+
+  # Initialise the results data frame for all (k, q) combinations
+  results_grid <- expand.grid(k = k_range, q = q_range)
+  results_grid$Silhouette  <- NA_real_
+  results_grid$CH          <- NA_real_
+  results_grid$ProbSilh    <- NA_real_
+  results_grid$runtime_sec <- NA_real_
+  results_grid$status      <- "ok"
+  results_grid$notes       <- NA_character_
+
+  total_jobs  <- nrow(results_grid)
+  pb          <- txtProgressBar(min = 0, max = total_jobs, style = 3)
+
+  # Storage for fitted model objects (needed to retrieve labels after the loop)
+  fpdc_models <- vector("list", nrow(results_grid))
+
+  # ── Inner loop: grid search over (k, q) ─────────────────────────────────
+  for (i in seq_len(nrow(results_grid))) {
+
+    setTxtProgressBar(pb, i)
+
+    k_val <- results_grid$k[i]
+    q_val <- results_grid$q[i]
+
+    # Per-(k, q) cache file – avoids re-fitting if this cell was already run
+    cache_file <- file.path(
+      "output/fpdc_cache",
+      paste0("fpdc_", embedding_tag, "_k", k_val, "_q", q_val, ".rds")
+    )
+
+    if (file.exists(cache_file)) {
+      # ── Cache hit: load pre-computed metrics ──────────────────────────────
+      cat("Loading cached result for", embedding_tag, "k =", k_val, "q =", q_val, "\n")
+      cached   <- readRDS(cache_file)
+      model    <- cached$model
+      avg_sil  <- cached$Silhouette
+      ch_val   <- cached$CH
+      prob_sil <- cached$ProbSilh
+
+    } else {
+      # ── Cache miss: fit FPDC and compute evaluation metrics ───────────────
+      cat("Running FPDC for", embedding_tag, "k =", k_val, "q =", q_val, "\n")
+
+      t0 <- Sys.time()
+
+      # FPDC(data, k, max_iter, q)
+      # Errors and warnings are caught so a single bad (k,q) cell does not
+      # abort the entire grid search; status/notes are recorded instead.
+      model <- tryCatch(
+        FPDC(
+          embedding_matrix,
+          k_val,
+          20,     # maximum EM iterations
+          q_val
+        ),
+        warning = function(w) {
+          results_grid$status[i] <<- "warning"
+          results_grid$notes[i]  <<- conditionMessage(w)
+          invokeRestart("muffleWarning")
+        },
+        error = function(e) {
+          results_grid$status[i] <<- "error"
+          results_grid$notes[i]  <<- conditionMessage(e)
+          NULL
+        }
+      )
+
+      results_grid$runtime_sec[i] <- as.numeric(difftime(Sys.time(), t0, units = "secs"))
+
+      if (is.null(model)) next   # Skip metric computation if FPDC failed
+
+      labels <- model$label
+
+      # Average Silhouette Width – measures intra- vs. inter-cluster distance
+      sil     <- silhouette(labels, dmat)
+      avg_sil <- mean(sil[, 3])
+
+      # Calinski-Harabasz index – ratio of between- to within-cluster dispersion
+      ch_val <- intCriteria(
+        traj = embedding_matrix,
+        part = as.integer(labels),
+        crit = "Calinski_Harabasz"
+      )$calinski_harabasz
+
+      # Probability Silhouette – FPDC-specific metric using membership probs
+      prob_sil <- Silh(model$probability)
+
+      # Persist result so this (k, q) cell is never re-computed
+      saveRDS(
+        list(
+          model          = model,
+          Silhouette     = avg_sil,
+          CH             = ch_val,
+          ProbSilh       = prob_sil,
+          runtime_sec    = results_grid$runtime_sec[i],
+          status         = results_grid$status[i],
+          notes          = results_grid$notes[i],
+          k              = k_val,
+          q              = q_val,
+          embedding_path = embedding_path
+        ),
+        cache_file
+      )
+    }
+
+    # Write metrics back into the grid data frame for this (k, q) cell
+    results_grid$Silhouette[i] <- avg_sil
+    results_grid$CH[i]         <- ch_val
+    results_grid$ProbSilh[i]   <- prob_sil
+    fpdc_models[[i]]           <- model
+  }
+
+  close(pb)
+
+  # ── Select best (k, q) for this embedding ────────────────────────────────
+  # Primary criterion: highest Silhouette; CH used implicitly as tiebreaker
+  best_index  <- which.max(results_grid$Silhouette)
+  best_params <- results_grid[best_index, ]
+
+  best_k      <- best_params$k
+  best_q      <- best_params$q
+  best_fpdc   <- fpdc_models[[best_index]]
+  best_labels <- best_fpdc$label
+
+  # Data frame mapping each user to their cluster assignment
+  cluster_df <- data.frame(
+    UserID  = user_ids,
+    Cluster = best_labels
+  )
+
+  runtime_total_sec <- as.numeric(difftime(Sys.time(), embedding_t0, units = "secs"))
+
+  cluster_sizes <- table(cluster_df$Cluster)
+
+  # Collect any warning/error messages emitted during the grid search
+  notes_text <- NA_character_
+  if ("notes" %in% names(results_grid)) {
+    tmp_notes <- unique(na.omit(results_grid$notes))
+    if (length(tmp_notes) > 0) {
+      notes_text <- paste(tmp_notes, collapse = " | ")
+    }
+  }
+
+  # One-row summary for this embedding, used in cross-embedding comparisons
+  summary_row <- data.frame(
+    method            = "FPDC",
+    embedding         = embedding_tag,
+    best_k            = best_k,
+    best_q            = best_q,
+    silhouette        = best_params$Silhouette,
+    CH                = best_params$CH,
+    prob_silh         = best_params$ProbSilh,
+    cluster_size_min  = min(cluster_sizes),
+    cluster_size_max  = max(cluster_sizes),
+    cluster_size_sd   = sd(as.numeric(cluster_sizes)),
+    runtime_total_sec = runtime_total_sec,
+    notes             = notes_text
+  )
+
+  # Store all artefacts for this embedding in the master list
+  all_results[[embedding_tag]] <- list(
+    embedding_path   = embedding_path,
+    embedding_tag    = embedding_tag,
+    embedding_matrix = embedding_matrix,
+    user_ids         = user_ids,
+    results_grid     = results_grid,
+    best_index       = best_index,
+    best_params      = best_params,
+    best_k           = best_k,
+    best_q           = best_q,
+    best_fpdc        = best_fpdc,
+    best_labels      = best_labels,
+    cluster_df       = cluster_df,
+    dmat             = dmat,
+    runtime_total_sec = runtime_total_sec,
+    summary_row      = summary_row,
+    # Placeholder fields for optional stability analysis (multi-seed runs)
+    stability_info   = list(
+      seeds_tested      = NA,
+      n_runs            = NA,
+      chosen_k_values   = NA,
+      chosen_q_values   = NA,
+      ari_mean          = NA,
+      ari_sd            = NA,
+      stability_notes   = NA_character_
+    )
+  )
+
+  cat("Finished:", embedding_tag, "\n")
+}
+```
+
+
+# 2. Inspect possible factor dimensions
+```{r dims}
+# Uncomment to inspect Tucker factor dimensionality for a given embedding.
+# This can help inform the choice of q_range before running the full grid.
+# TuckerFactors(embedding_matrix, 6)
+```
+
+# 3. Show tuning results
+
+```{r tune}
+# Print the full (k, q) results grid and the selected best parameters
+# for each embedding, giving a textual overview of model selection.
+for (name in names(all_results)) {
+  cat("\n==========", name, "==========\n")
+  print(all_results[[name]]$results_grid)
+  cat("\nBest parameters:\n")
+  print(all_results[[name]]$best_params)
+}
+```
+
+# 4. Plot tuning results for each embedding
+```{r tune-plots}
+# ── Silhouette vs. q (one line per k) ────────────────────────────────────────
+for (name in names(all_results)) {
+  res <- all_results[[name]]
+
+  p_sil <- ggplot(res$results_grid, aes(x = q, y = Silhouette, color = factor(k), group = k)) +
+    geom_line() +
+    geom_point(size = 2) +
+    theme_minimal() +
+    labs(
+      title = paste("Silhouette by q and k -", name),
+      x     = "Factor Dimension (q)",
+      y     = "Average Silhouette Width",
+      color = "Clusters (k)"
+    )
+
+  print(p_sil)
+
+  ggsave(
+    filename = file.path("output/fpdc_plots", paste0("tuning_silhouette_", name, ".png")),
+    plot     = p_sil,
+    width = 9, height = 6, dpi = 120
+  )
+}
+
+# ── Calinski-Harabasz vs. q (one line per k) ─────────────────────────────────
+for (name in names(all_results)) {
+  res <- all_results[[name]]
+
+  p_ch <- ggplot(res$results_grid, aes(x = q, y = CH, color = factor(k), group = k)) +
+    geom_line() +
+    geom_point(size = 2) +
+    theme_minimal() +
+    labs(
+      title = paste("CH by q and k -", name),
+      x     = "Factor Dimension (q)",
+      y     = "Calinski-Harabasz Index",
+      color = "Clusters (k)"
+    )
+
+  print(p_ch)
+
+  ggsave(
+    filename = file.path("output/fpdc_plots", paste0("tuning_ch_", name, ".png")),
+    plot     = p_ch,
+    width = 9, height = 6, dpi = 120
+  )
+}
+
+# ── Probability Silhouette vs. q (one line per k) ────────────────────────────
+for (name in names(all_results)) {
+  res <- all_results[[name]]
+
+  p_prob <- ggplot(res$results_grid, aes(x = q, y = ProbSilh, color = factor(k), group = k)) +
+    geom_line() +
+    geom_point(size = 2) +
+    theme_minimal() +
+    labs(
+      title = paste("Probability Silhouette by q and k -", name),
+      x     = "Factor Dimension (q)",
+      y     = "Probability Silhouette",
+      color = "Clusters (k)"
+    )
+
+  print(p_prob)
+
+  ggsave(
+    filename = file.path("output/fpdc_plots", paste0("tuning_prob_silh_", name, ".png")),
+    plot     = p_prob,
+    width = 9, height = 6, dpi = 120
+  )
+}
+```
+
+```{r best}
+# ── Identify the single best (embedding, k, q) combination across all embeddings
+
+# Collect the best-parameter row from every embedding into one data frame
+all_best <- lapply(all_results, function(res) {
+  data.frame(
+    embedding  = res$embedding_tag,
+    best_k     = res$best_k,
+    best_q     = res$best_q,
+    Silhouette = res$best_params$Silhouette,
+    CH         = res$best_params$CH,
+    ProbSilh   = res$best_params$ProbSilh
+  )
+})
+
+all_best_df <- dplyr::bind_rows(all_best)
+print(all_best_df)
+
+# Select the overall winner: highest Silhouette, then highest CH as tiebreaker
+best_overall_index <- with(all_best_df, order(-Silhouette, -CH))[1]
+best_overall       <- all_best_df[best_overall_index, ]
+print(best_overall)
+
+# Pull the full result for the winning embedding so later chunks can reference it
+best_name <- best_overall$embedding
+best_res  <- all_results[[best_name]]
+
+best_fpdc             <- best_res$best_fpdc
+best_params           <- best_res$best_params
+best_k                <- best_res$best_k
+best_q                <- best_res$best_q
+best_labels           <- best_res$best_labels
+cluster_df            <- best_res$cluster_df
+best_dmat             <- best_res$dmat
+best_embedding_matrix <- best_res$embedding_matrix
+best_results_grid     <- best_res$results_grid
+```
+
+
+
+# 5. PCA plots for best models
+```{r pca}
+# Project each embedding's best cluster solution onto its first two principal
+# components and plot, coloured by cluster assignment.
+for (name in names(all_results)) {
+  res <- all_results[[name]]
+
+  pca <- prcomp(res$embedding_matrix)
+
+  pca_df <- data.frame(
+    PC1     = pca$x[, 1],
+    PC2     = pca$x[, 2],
+    Cluster = as.factor(res$best_labels)
+  )
+
+  p_pca <- ggplot(pca_df, aes(x = PC1, y = PC2, color = Cluster)) +
+    geom_point(alpha = 0.6) +
+    theme_minimal() +
+    labs(
+      title = paste("FPDC Clusters (PCA Projection) -", name,
+                    "k =", res$best_k, ", q =", res$best_q),
+      x = "PC1",
+      y = "PC2"
+    )
+
+  print(p_pca)
+
+  ggsave(
+    filename = file.path(
+      "output/fpdc_plots",
+      paste0("pca_", name, "_k", res$best_k, "_q", res$best_q, ".png")
+    ),
+    plot  = p_pca,
+    width = 9, height = 6, dpi = 120
+  )
+}
+```
+
+# 6. Probability silhouette and cluster sizes
+```{r results-fpdc}
+# Print a concise summary for each embedding: best hyperparameters, all three
+# quality metrics, and the raw cluster size distribution.
+for (name in names(all_results)) {
+  res <- all_results[[name]]
+
+  cat("\n==========", name, "==========\n")
+  cat("Best k:", res$best_k, "\n")
+  cat("Best q:", res$best_q, "\n")
+  cat("Best silhouette:", res$best_params$Silhouette, "\n")
+  cat("Best CH:", res$best_params$CH, "\n")
+  cat("Best probability silhouette:", res$best_params$ProbSilh, "\n")
+  cat("Cluster sizes:\n")
+  print(table(res$best_labels))
+}
+```
+
+
+# 8. PCA visualization
+```{r pca-plots}
+# Standalone PCA scatter plot for the single best overall model (across all
+# embeddings), for inclusion in reports or quick inspection.
+pca <- prcomp(best_embedding_matrix)
+
+pca_df <- data.frame(
+  PC1     = pca$x[, 1],
+  PC2     = pca$x[, 2],
+  Cluster = as.factor(best_labels)
+)
+
+ggplot(pca_df, aes(x = PC1, y = PC2, color = Cluster)) +
+  geom_point(alpha = 0.6) +
+  theme_minimal() +
+  labs(
+    title = paste("FPDC Clusters (PCA Projection) -", best_name,
+                  "k =", best_k, ", q =", best_q),
+    x = "PC1",
+    y = "PC2"
+  )
+```
+
+# 9. Probability-based silhouette
+```{r silh}
+# Compute the FPDC-native probability silhouette for the overall best model.
+# This uses soft membership probabilities rather than hard cluster labels.
+Silh(best_fpdc$probability)
+```
+
+# 10. Save results
+```{r save}
+# Persist all artefacts for downstream use and reproducibility:
+#   • cluster assignment CSVs (UserID → Cluster)
+#   • full tuning grid CSVs   (all k/q combinations with their metrics)
+#   • serialised model .rds   (best FPDC object per embedding)
+#   • serialised full result  (everything needed to reload without re-fitting)
+
+for (name in names(all_results)) {
+  res <- all_results[[name]]
+
+  # Cluster assignments for this embedding's best model
+  write.csv(
+    res$cluster_df,
+    file = file.path(
+      "output/fpdc_results",
+      paste0("fpdc_clusters_", name, "_k", res$best_k, "_q", res$best_q, ".csv")
+    ),
+    row.names = FALSE
+  )
+
+  # Full tuning grid results (all k/q combinations) for this embedding
+  write.csv(
+    res$results_grid,
+    file = file.path(
+      "output/fpdc_results",
+      paste0("fpdc_tuning_results_", name, ".csv")
+    ),
+    row.names = FALSE
+  )
+
+  # Serialised best FPDC model object (allows reloading without re-fitting)
+  saveRDS(
+    res$best_fpdc,
+    file = file.path(
+      "output/fpdc_cache",
+      paste0("best_fpdc_", name, "_k", res$best_k, "_q", res$best_q, ".rds")
+    )
+  )
+
+  # Serialised full result list (used by the comparison notebook to load
+  # results without re-running this notebook)
+  saveRDS(
+    res,
+    file = file.path(
+      "output/fpdc_cache",
+      paste0("fpdc_full_result_", name, ".rds")
+    )
+  )
+}
+
+# Cluster assignments for the single best overall model
+write.csv(
+  cluster_df,
+  file = file.path(
+    "output/fpdc_results",
+    paste0("fpdc_best_overall_clusters_", best_name, "_k", best_k, "_q", best_q, ".csv")
+  ),
+  row.names = FALSE
+)
+
+# Tuning grid for the overall best embedding
+write.csv(
+  best_results_grid,
+  file = file.path(
+    "output/fpdc_results",
+    "fpdc_tuning_results_best_overall.csv"
+  ),
+  row.names = FALSE
+)
+
+# Cross-embedding comparison of best (k, q) per embedding
+write.csv(
+  all_best_df,
+  file = file.path(
+    "output/fpdc_results",
+    "fpdc_best_overall_summary.csv"
+  ),
+  row.names = FALSE
+)
+
+# One-row-per-embedding summary table (used for the cross-method comparison)
+all_summary_df <- bind_rows(lapply(all_results, function(x) x$summary_row))
+
+write.csv(
+  all_summary_df,
+  file = file.path("output/fpdc_results", "fpdc_summary_table.csv"),
+  row.names = FALSE
+)
+```

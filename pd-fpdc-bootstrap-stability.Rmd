@@ -1,0 +1,445 @@
+---
+title: "MovieLens 1M: Bootstrap Stability for PD and FPDC"
+author: ""
+date: "`r format(Sys.Date())`"
+output:
+  pdf_document:
+    toc: true
+    number_sections: true
+  html_document: default
+fontsize: 11pt
+geometry: margin=1in
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  warning = FALSE,
+  message = FALSE,
+  fig.width = 9,
+  fig.height = 6,
+  dpi = 120
+)
+set.seed(42)
+```
+
+# 1. Requirements
+```{r bootstrap-stability-pd-vs-fpdc}
+required_packages <- c(
+  "readr", "dplyr", "tidyr", "ggplot2", "mclust",
+  "cluster", "clusterCrit", "FPDclustering"
+)
+
+installed <- rownames(installed.packages())
+missing_pkgs <- setdiff(required_packages, installed)
+
+if (length(missing_pkgs) > 0) {
+  install.packages(missing_pkgs)
+}
+
+library(readr)
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(mclust)
+library(cluster)
+library(clusterCrit)
+library(FPDclustering)
+```
+
+# 2. Settings
+```{r settings}
+# ------------------------------------------------------------
+# SETTINGS
+# ------------------------------------------------------------
+embedding_paths <- c(
+  "output/embeddings/user_embeddings_64.csv",
+  "output/embeddings/user_embeddings_128.csv",
+  "output/embeddings/user_embeddings_256.csv"
+)
+
+k_to_compare <- c(2, 3, 4, 5)
+q_range <- 2:4
+n_boot <- 30
+bootstrap_replace <- TRUE
+sample_fraction <- 1.0
+fpdc_nstart <- 20
+
+set.seed(123)
+
+dir.create("output/bootstrap_stability_results", recursive = TRUE, showWarnings = FALSE)
+dir.create("output/bootstrap_stability_cache", recursive = TRUE, showWarnings = FALSE)
+```
+
+# 3. Helpers
+```{r helpers}
+# ------------------------------------------------------------
+# HELPERS
+# ------------------------------------------------------------
+
+load_cached_pd_for_k <- function(embedding_tag, k_val,
+                                 cache_dir = "output/pd_cache") {
+  cache_file <- file.path(
+    cache_dir,
+    paste0("pd_", embedding_tag, "_k", k_val, ".rds")
+  )
+
+  if (!file.exists(cache_file)) {
+    return(NULL)
+  }
+
+  readRDS(cache_file)
+}
+
+load_best_cached_fpdc_for_k <- function(embedding_tag, k_val, q_vals = 2:4,
+                                        cache_dir = "output/fpdc_cache") {
+  candidates <- list()
+
+  for (q_val in q_vals) {
+    cache_file <- file.path(
+      cache_dir,
+      paste0("fpdc_", embedding_tag, "_k", k_val, "_q", q_val, ".rds")
+    )
+
+    if (file.exists(cache_file)) {
+      cached <- readRDS(cache_file)
+
+      candidates[[length(candidates) + 1]] <- list(
+        k = k_val,
+        q = q_val,
+        model = cached$model,
+        silhouette = cached$Silhouette,
+        ch = cached$CH,
+        prob_silh = cached$ProbSilh,
+        file = cache_file
+      )
+    }
+  }
+
+  if (length(candidates) == 0) {
+    return(NULL)
+  }
+
+  candidate_df <- bind_rows(lapply(candidates, function(x) {
+    data.frame(
+      q = x$q,
+      Silhouette = x$silhouette,
+      CH = x$ch,
+      ProbSilh = x$prob_silh
+    )
+  }))
+
+  best_idx <- with(candidate_df, order(-Silhouette, -CH))[1]
+  candidates[[best_idx]]
+}
+
+
+bootstrap_indices <- function(n, replace = TRUE, fraction = 1.0) {
+  sample(seq_len(n), size = max(2, floor(fraction * n)), replace = replace)
+}
+
+bootstrap_ari_vs_reference <- function(reference_labels, boot_labels, sampled_idx) {
+  sampled_unique <- sort(unique(sampled_idx))
+
+  if (length(sampled_unique) < 2) {
+    return(NA_real_)
+  }
+
+  boot_first_pos <- match(sampled_unique, sampled_idx)
+  boot_labels_unique <- boot_labels[boot_first_pos]
+  ref_labels_unique <- reference_labels[sampled_unique]
+
+  if (length(unique(boot_labels_unique)) < 2 || length(unique(ref_labels_unique)) < 2) {
+    return(NA_real_)
+  }
+
+  adjustedRandIndex(ref_labels_unique, boot_labels_unique)
+}
+
+compute_avg_silhouette <- function(x, labels) {
+  if (length(unique(labels)) < 2) {
+    return(NA_real_)
+  }
+
+  dmat <- dist(x)
+  sil <- silhouette(as.integer(labels), dmat)
+  mean(sil[, 3])
+}
+
+compute_ch <- function(x, labels) {
+  if (length(unique(labels)) < 2) {
+    return(NA_real_)
+  }
+
+  intCriteria(
+    traj = x,
+    part = as.integer(labels),
+    crit = "Calinski_Harabasz"
+  )$calinski_harabasz
+}
+```
+
+# 4. Main bootstrap loop
+```{r main}
+# ------------------------------------------------------------
+# MAIN LOOP
+# ------------------------------------------------------------
+
+bootstrap_results <- list()
+
+for (embedding_path in embedding_paths) {
+
+  if (!file.exists(embedding_path)) {
+    cat("Missing embedding file:", embedding_path, "\n")
+    next
+  }
+
+  embedding_tag <- tools::file_path_sans_ext(basename(embedding_path))
+  cat("\nProcessing:", embedding_tag, "\n")
+
+  embeddings <- read_csv(embedding_path, show_col_types = FALSE)
+  user_ids <- embeddings[[1]]
+  embedding_matrix <- embeddings[, -1] |> as.matrix()
+  embedding_matrix <- scale(embedding_matrix)
+
+  n <- nrow(embedding_matrix)
+
+  for (k_val in k_to_compare) {
+    cat("  Bootstrapping PD and FPDC for k =", k_val, "\n")
+
+    pd_cached <- load_cached_pd_for_k(
+      embedding_tag = embedding_tag,
+      k_val = k_val,
+      cache_dir = "output/pd_cache"
+    )
+
+    fpdc_cached <- load_best_cached_fpdc_for_k(
+      embedding_tag = embedding_tag,
+      k_val = k_val,
+      q_vals = q_range,
+      cache_dir = "output/fpdc_cache"
+    )
+
+    if (is.null(pd_cached)) {
+      cat("    Missing PD cache for k =", k_val, "\n")
+      next
+    }
+
+    if (is.null(fpdc_cached)) {
+      cat("    Missing FPDC cache for k =", k_val, "\n")
+      next
+    }
+
+    pd_reference_labels <- pd_cached$labels
+    fpdc_reference_labels <- fpdc_cached$model$label
+    best_q <- fpdc_cached$q
+
+    if (length(pd_reference_labels) != n || length(fpdc_reference_labels) != n) {
+      cat("    Label length mismatch for", embedding_tag, "k =", k_val, "\n")
+      next
+    }
+
+    boot_cache_file <- file.path(
+      "output/bootstrap_stability_cache",
+      paste0("bootstrap_", embedding_tag, "_k", k_val, ".rds")
+    )
+
+    if (file.exists(boot_cache_file)) {
+      cat("    Loading cached bootstrap results for", embedding_tag, "k =", k_val, "\n")
+      boot_summary <- readRDS(boot_cache_file)
+    } else {
+      pd_boot_ari <- rep(NA_real_, n_boot)
+      fpdc_boot_ari <- rep(NA_real_, n_boot)
+      pd_boot_sil <- rep(NA_real_, n_boot)
+      fpdc_boot_sil <- rep(NA_real_, n_boot)
+      pd_boot_ch <- rep(NA_real_, n_boot)
+      fpdc_boot_ch <- rep(NA_real_, n_boot)
+      pd_status <- rep("ok", n_boot)
+      fpdc_status <- rep("ok", n_boot)
+
+      for (b in seq_len(n_boot)) {
+        cat("    Bootstrap replicate", b, "of", n_boot, "\n")
+
+        sampled_idx <- bootstrap_indices(
+          n = n,
+          replace = bootstrap_replace,
+          fraction = sample_fraction
+        )
+
+        x_boot <- embedding_matrix[sampled_idx, , drop = FALSE]
+
+        pd_model_boot <- tryCatch(
+          suppressWarnings(PDC(x_boot, k = k_val)),
+          error = function(e) {
+            pd_status[b] <<- paste("error:", conditionMessage(e))
+            NULL
+          }
+        )
+
+        if (!is.null(pd_model_boot)) {
+          pd_labels_boot <- pd_model_boot$label
+          pd_boot_ari[b] <- bootstrap_ari_vs_reference(
+            reference_labels = pd_reference_labels,
+            boot_labels = pd_labels_boot,
+            sampled_idx = sampled_idx
+          )
+          pd_boot_sil[b] <- compute_avg_silhouette(x_boot, pd_labels_boot)
+          pd_boot_ch[b] <- compute_ch(x_boot, pd_labels_boot)
+        }
+
+        fpdc_model_boot <- tryCatch(
+          suppressWarnings(FPDC(x_boot, k_val, fpdc_nstart, best_q)),
+          error = function(e) {
+            fpdc_status[b] <<- paste("error:", conditionMessage(e))
+            NULL
+          }
+        )
+
+        if (!is.null(fpdc_model_boot)) {
+          fpdc_labels_boot <- fpdc_model_boot$label
+          fpdc_boot_ari[b] <- bootstrap_ari_vs_reference(
+            reference_labels = fpdc_reference_labels,
+            boot_labels = fpdc_labels_boot,
+            sampled_idx = sampled_idx
+          )
+          fpdc_boot_sil[b] <- compute_avg_silhouette(x_boot, fpdc_labels_boot)
+          fpdc_boot_ch[b] <- compute_ch(x_boot, fpdc_labels_boot)
+        }
+      }
+
+      boot_summary <- list(
+        embedding = embedding_tag,
+        k = k_val,
+        fpdc_best_q = best_q,
+        n_boot = n_boot,
+        bootstrap_replace = bootstrap_replace,
+        sample_fraction = sample_fraction,
+        pd_reference_silhouette = pd_cached$avg_silhouette,
+        pd_reference_ch = pd_cached$ch,
+        pd_reference_prob_silh = pd_cached$prob_silh,
+        fpdc_reference_silhouette = fpdc_cached$silhouette,
+        fpdc_reference_ch = fpdc_cached$ch,
+        fpdc_reference_prob_silh = fpdc_cached$prob_silh,
+        pd_boot_ari = pd_boot_ari,
+        fpdc_boot_ari = fpdc_boot_ari,
+        pd_boot_sil = pd_boot_sil,
+        fpdc_boot_sil = fpdc_boot_sil,
+        pd_boot_ch = pd_boot_ch,
+        fpdc_boot_ch = fpdc_boot_ch,
+        pd_status = pd_status,
+        fpdc_status = fpdc_status
+      )
+
+      saveRDS(boot_summary, boot_cache_file)
+    }
+
+    bootstrap_results[[length(bootstrap_results) + 1]] <- data.frame(
+      embedding = boot_summary$embedding,
+      k = boot_summary$k,
+      fpdc_best_q = boot_summary$fpdc_best_q,
+      n_boot = boot_summary$n_boot,
+      pd_reference_silhouette = boot_summary$pd_reference_silhouette,
+      pd_reference_ch = boot_summary$pd_reference_ch,
+      pd_reference_prob_silh = boot_summary$pd_reference_prob_silh,
+      fpdc_reference_silhouette = boot_summary$fpdc_reference_silhouette,
+      fpdc_reference_ch = boot_summary$fpdc_reference_ch,
+      fpdc_reference_prob_silh = boot_summary$fpdc_reference_prob_silh,
+      pd_bootstrap_ari_mean = mean(boot_summary$pd_boot_ari, na.rm = TRUE),
+      pd_bootstrap_ari_sd = sd(boot_summary$pd_boot_ari, na.rm = TRUE),
+      pd_bootstrap_ari_median = median(boot_summary$pd_boot_ari, na.rm = TRUE),
+      fpdc_bootstrap_ari_mean = mean(boot_summary$fpdc_boot_ari, na.rm = TRUE),
+      fpdc_bootstrap_ari_sd = sd(boot_summary$fpdc_boot_ari, na.rm = TRUE),
+      fpdc_bootstrap_ari_median = median(boot_summary$fpdc_boot_ari, na.rm = TRUE),
+      pd_bootstrap_sil_mean = mean(boot_summary$pd_boot_sil, na.rm = TRUE),
+      fpdc_bootstrap_sil_mean = mean(boot_summary$fpdc_boot_sil, na.rm = TRUE),
+      pd_bootstrap_ch_mean = mean(boot_summary$pd_boot_ch, na.rm = TRUE),
+      fpdc_bootstrap_ch_mean = mean(boot_summary$fpdc_boot_ch, na.rm = TRUE),
+      pd_valid_boot = sum(is.finite(boot_summary$pd_boot_ari)),
+      fpdc_valid_boot = sum(is.finite(boot_summary$fpdc_boot_ari)),
+      stringsAsFactors = FALSE
+    )
+  }
+}
+```
+
+# 5. Final table
+```{r final}
+# ------------------------------------------------------------
+# FINAL TABLE
+# ------------------------------------------------------------
+bootstrap_results_df <- bind_rows(bootstrap_results) %>%
+  arrange(embedding, k)
+
+print(bootstrap_results_df)
+
+write.csv(
+  bootstrap_results_df,
+  file = file.path(
+    "output/bootstrap_stability_results",
+    "bootstrap_stability_pd_vs_fpdc_summary.csv"
+  ),
+  row.names = FALSE
+)
+```
+
+# 6. Plot bootstrap stability
+```{r plot-bootstrap-stability}
+plot_df <- bootstrap_results_df %>%
+  select(
+    embedding,
+    k,
+    pd_bootstrap_ari_mean,
+    fpdc_bootstrap_ari_mean
+  ) %>%
+  tidyr::pivot_longer(
+    cols = c(pd_bootstrap_ari_mean, fpdc_bootstrap_ari_mean),
+    names_to = "method",
+    values_to = "mean_bootstrap_ari"
+  ) %>%
+  mutate(
+    method = dplyr::case_when(
+      method == "pd_bootstrap_ari_mean" ~ "PD",
+      method == "fpdc_bootstrap_ari_mean" ~ "FPDC",
+      TRUE ~ method
+    )
+  )
+
+ggplot(plot_df, aes(x = k, y = mean_bootstrap_ari, color = method)) +
+  geom_line(linewidth = 1) +
+  geom_point(size = 2) +
+  facet_wrap(~ embedding, scales = "free_y") +
+  theme_minimal() +
+  labs(
+    title = "Bootstrap stability by embedding and k",
+    x = "Number of clusters (k)",
+    y = "Mean bootstrap ARI",
+    color = "Method"
+  )
+```
+
+# 7. Inspect one cached bootstrap result
+```{r inspect-one-bootstrap-run}
+embedding_tag <- "user_embeddings_128"
+k_val <- 3
+
+cache_file <- file.path(
+  "output/bootstrap_stability_cache",
+  paste0("bootstrap_", embedding_tag, "_k", k_val, ".rds")
+)
+
+if (file.exists(cache_file)) {
+  boot_obj <- readRDS(cache_file)
+
+  inspect_df <- data.frame(
+    replicate = seq_len(boot_obj$n_boot),
+    pd_boot_ari = boot_obj$pd_boot_ari,
+    fpdc_boot_ari = boot_obj$fpdc_boot_ari,
+    pd_boot_sil = boot_obj$pd_boot_sil,
+    fpdc_boot_sil = boot_obj$fpdc_boot_sil,
+    pd_status = boot_obj$pd_status,
+    fpdc_status = boot_obj$fpdc_status
+  )
+
+  print(inspect_df)
+}
+```
