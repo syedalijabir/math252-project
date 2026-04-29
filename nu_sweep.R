@@ -55,8 +55,8 @@ library(FPDclustering)  # FPDC(), Silh()
 nu_sweep_embedding <- "output/embeddings/user_embeddings_64.csv"
 
 # nu values to test — log-spaced to cover a wide range efficiently.
-# Covers soft (nu=1) through near-Gaussian (nu=100) behaviour.
-nu_values <- c(1, 2, 5, 10, 20, 50, 100)
+# Covers soft (nu=1) through near-Gaussian (nu=100) behavior.
+nu_values <- c(5, 10, 15, 20, 30, 50)
 
 # Fix k and nf at mid-range values from the main grid (k: 2-8).
 # nf = number of factors for variables (what the main Rmd calls q).
@@ -68,7 +68,7 @@ nu_fixed_nf <- 20   # matches the hardcoded nf=20 in the main Rmd
 # Subsample size: number of users to draw for each FPDC call.
 # 1000-2000 is usually enough to get a reliable signal for nu without
 # the full-data runtime cost.
-nu_subsample_n <- 1500
+nu_subsample_n <- 3000
 
 # Random seed — ensures the same subsample is drawn every time,
 # so results are reproducible and cache hits work correctly.
