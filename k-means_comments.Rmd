@@ -1,0 +1,648 @@
+---
+title: "MovieLens 1M: K-means Clustering the Embeddings"
+author: ""
+date: "`r format(Sys.Date())`"
+output:
+  pdf_document:
+fontsize: 11pt
+geometry: margin=1in
+---
+
+<!--
+================================================================================
+  GOAL
+  ----
+  Apply standard K-Means clustering to user embedding vectors from the
+  MovieLens 1M dataset, available at three dimensionalities (64, 128, 256).
+  Three K-Means algorithms (Hartigan-Wong, Lloyd, MacQueen) are evaluated
+  across k = 2:20 using three complementary criteria — WSS (elbow method),
+  Average Silhouette Width, and Calinski-Harabasz index — to select the best
+  number of clusters. The final model uses MacQueen with the elbow-selected k,
+  and all results are saved for downstream comparison.
+
+  HOW IT WORKS
+  ------------
+  1. Setup        – Load libraries, create output directories, define embedding
+                    paths and the k range to evaluate.
+  2. Load helper  – load_kmeans_cached_results() reconstructs a full result
+                    object from per-algorithm cache files, used when the
+                    full-result cache is absent.
+  3. Eval helpers – evaluate_kmeans() fits one algorithm across all k values
+                    and returns WSS, Silhouette, and CH metrics per k.
+                    find_elbow_k() identifies the elbow of the WSS curve
+                    using the maximum perpendicular distance method.
+  4. Select k     – MacQueen results are used as the primary source; the elbow
+                    k is selected as final_k, with Silhouette and CH as
+                    supporting diagnostics.
+  5. Final fit    – A high-quality final k-means model is re-fitted with
+                    nstart = 100 on MacQueen to reduce sensitivity to
+                    random initialisation.
+  6. Visualize    – Plot Silhouette, CH, and WSS (with elbow marker) by k for
+                    all three algorithms, plus PCA projections of the final
+                    cluster assignments.
+  7. Save         – Write cluster assignment CSVs, metric CSVs, and serialised
+                    model objects (.rds) for each embedding.
+================================================================================
+-->
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  warning = FALSE,
+  message = FALSE,
+  fig.width = 9,
+  fig.height = 6,
+  dpi = 120
+)
+set.seed(42)
+```
+
+# Overview
+
+# 1. Requirements
+```{r libraries}
+required_packages <- c(
+  "readr", "dplyr", "tidyr", "ggplot2",
+  "cluster",     # silhouette()
+  "clusterCrit", # intCriteria() for Calinski-Harabasz
+  "factoextra"   # fviz_* helpers
+)
+
+installed    <- rownames(installed.packages())
+missing_pkgs <- setdiff(required_packages, installed)
+if (length(missing_pkgs) > 0) {
+  install.packages(missing_pkgs)
+}
+
+library(readr)
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(cluster)
+library(clusterCrit)
+library(factoextra)
+```
+
+# 2. Load embeddings files
+```{r download-and-read}
+# Paths to the three pre-computed user embedding CSV files
+embedding_paths <- c(
+  "output/embeddings/user_embeddings_64.csv",
+  "output/embeddings/user_embeddings_128.csv",
+  "output/embeddings/user_embeddings_256.csv"
+)
+
+# Range of k values to evaluate for each embedding
+k_vals      <- 2:20
+all_results <- list()
+
+# Create output directories upfront so write steps never fail
+dir.create("output/kmeans_plots",   recursive = TRUE, showWarnings = FALSE)
+dir.create("output/kmeans_cache",   recursive = TRUE, showWarnings = FALSE)
+dir.create("output/kmeans_results", recursive = TRUE, showWarnings = FALSE)
+```
+
+
+# 3. Choose Number of Clusters
+```{r load-saved}
+# Reconstruct a full result object from per-algorithm cache files.
+# Used as a fallback when the full-result cache is absent but individual
+# algorithm results have already been saved.
+# Returns NULL if required cache files are missing.
+load_kmeans_cached_results <- function(embedding_path) {
+  embeddings       <- read_csv(embedding_path, show_col_types = FALSE)
+  user_ids         <- embeddings[[1]]
+  embedding_matrix <- scale(as.matrix(embeddings[, -1]))
+  embedding_tag    <- tools::file_path_sans_ext(basename(embedding_path))
+
+  # If the full-result cache exists, use it directly
+  full_file <- file.path(
+    "output/kmeans_cache",
+    paste0("kmeans_full_result_", embedding_tag, ".rds")
+  )
+  if (file.exists(full_file)) return(readRDS(full_file))
+
+  dmat <- dist(embedding_matrix)
+
+  # Cache file paths for each algorithm and the combined results
+  kmeans_file <- file.path("output/kmeans_cache", paste0("kmeans_result_", embedding_tag, ".rds"))
+  all_file    <- file.path("output/kmeans_cache", paste0("k_results_all_", embedding_tag, ".rds"))
+  mq_file     <- file.path("output/kmeans_cache", paste0("k_results_mq_",  embedding_tag, ".rds"))
+  hw_file     <- file.path("output/kmeans_cache", paste0("k_results_hw_",  embedding_tag, ".rds"))
+  lloyd_file  <- file.path("output/kmeans_cache", paste0("k_results_lloyd_", embedding_tag, ".rds"))
+
+  # All three core files must exist to reconstruct a valid result
+  if (!file.exists(kmeans_file) || !file.exists(all_file) || !file.exists(mq_file)) {
+    return(NULL)
+  }
+
+  kmeans_result <- readRDS(kmeans_file)
+  k_results_all <- readRDS(all_file)
+  k_results_mq  <- readRDS(mq_file)
+
+  # HW and Lloyd results are optional (may not have been saved in older runs)
+  k_results_hw    <- if (file.exists(hw_file))    readRDS(hw_file)    else NULL
+  k_results_lloyd <- if (file.exists(lloyd_file)) readRDS(lloyd_file) else NULL
+
+  # Select best k from MacQueen metrics
+  best_k_sil   <- k_results_mq$k[which.max(k_results_mq$Silhouette)]
+  best_k_ch    <- k_results_mq$k[which.max(k_results_mq$CH)]
+  elbow_info   <- find_elbow_k(k_results_mq$k, k_results_mq$WSS)
+  best_k_elbow <- elbow_info$elbow_k
+  final_k      <- nrow(kmeans_result$centers)
+
+  cluster_df    <- data.frame(UserID = user_ids, Cluster = kmeans_result$cluster)
+  final_sil     <- silhouette(kmeans_result$cluster, dmat)
+  final_avg_sil <- mean(final_sil[, 3])
+
+  # PCA projection for visualisation
+  pca           <- prcomp(embedding_matrix)
+  var_explained <- summary(pca)$importance[2, 1:2]
+  pca_df <- data.frame(
+    PC1     = pca$x[, 1],
+    PC2     = pca$x[, 2],
+    Cluster = as.factor(kmeans_result$cluster)
+  )
+
+  list(
+    embedding_path  = embedding_path,
+    embedding_tag   = embedding_tag,
+    embedding_matrix = embedding_matrix,
+    user_ids        = user_ids,
+    dmat            = dmat,
+    k_results_hw    = k_results_hw,
+    k_results_lloyd = k_results_lloyd,
+    k_results_mq    = k_results_mq,
+    k_results_all   = k_results_all,
+    best_k_sil      = best_k_sil,
+    best_k_ch       = best_k_ch,
+    best_k_elbow    = best_k_elbow,
+    elbow_distances = elbow_info$distances,
+    final_k         = final_k,
+    kmeans_result   = kmeans_result,
+    cluster_df      = cluster_df,
+    final_sil       = final_sil,
+    final_avg_sil   = final_avg_sil,
+    pca_df          = pca_df,
+    var_explained   = var_explained
+  )
+}
+```
+
+
+```{r eval-funct}
+# ── Evaluation helpers ───────────────────────────────────────────────────────
+
+# Fit one k-means algorithm across all k values and return metrics + models.
+# For each k, records:
+#   WSS        – total within-cluster sum of squares (elbow method)
+#   Silhouette – average silhouette width
+#   CH         – Calinski-Harabasz index
+# Errors and warnings are caught per-k so one failure does not abort the loop.
+evaluate_kmeans <- function(x, k_vals, dmat, algorithm = "Hartigan-Wong",
+                            nstart = 10, iter.max = 100) {
+
+  wss         <- numeric(length(k_vals))
+  sil_scores  <- numeric(length(k_vals))
+  ch_scores   <- numeric(length(k_vals))
+  runtime_sec <- numeric(length(k_vals))
+  status      <- rep("ok", length(k_vals))
+  notes       <- rep(NA_character_, length(k_vals))
+  models      <- vector("list", length(k_vals))
+
+  for (i in seq_along(k_vals)) {
+    k  <- k_vals[i]
+    t0 <- Sys.time()
+
+    km <- tryCatch(
+      kmeans(
+        x,
+        centers   = k,
+        nstart    = nstart,
+        iter.max  = iter.max,
+        algorithm = algorithm
+      ),
+      warning = function(w) {
+        status[i] <<- "warning"
+        notes[i]  <<- conditionMessage(w)
+        invokeRestart("muffleWarning")
+      },
+      error = function(e) {
+        status[i] <<- "error"
+        notes[i]  <<- conditionMessage(e)
+        NULL
+      }
+    )
+
+    runtime_sec[i] <- as.numeric(difftime(Sys.time(), t0, units = "secs"))
+
+    if (is.null(km)) next
+
+    models[[i]]   <- km
+    wss[i]        <- km$tot.withinss
+
+    sil           <- silhouette(km$cluster, dmat)
+    sil_scores[i] <- mean(sil[, 3])
+
+    ch_scores[i] <- intCriteria(
+      traj = x,
+      part = as.integer(km$cluster),
+      crit = "Calinski_Harabasz"
+    )$calinski_harabasz
+  }
+
+  data.frame(
+    Algorithm   = algorithm,
+    k           = k_vals,
+    WSS         = wss,
+    Silhouette  = sil_scores,
+    CH          = ch_scores,
+    runtime_sec = runtime_sec,
+    status      = status,
+    notes       = notes
+  ) |>
+    dplyr::mutate(model_index = seq_along(k_vals)) |>
+    list(metrics = _, models = models)
+}
+
+# Detect the elbow of the WSS curve using the maximum perpendicular distance
+# from the line connecting the first and last points.
+# Returns the elbow k and the distance of every k from that line.
+find_elbow_k <- function(k, wss) {
+  pts <- cbind(k, wss)
+  p1  <- pts[1, ]
+  p2  <- pts[nrow(pts), ]
+
+  # Perpendicular distance from point p to the line defined by a and b
+  point_line_distance <- function(p, a, b) {
+    num <- abs((b[2] - a[2]) * p[1] - (b[1] - a[1]) * p[2] + b[1] * a[2] - b[2] * a[1])
+    den <- sqrt((b[2] - a[2])^2 + (b[1] - a[1])^2)
+    num / den
+  }
+
+  distances    <- apply(pts, 1, point_line_distance, a = p1, b = p2)
+  elbow_index  <- which.max(distances)
+
+  list(elbow_k = k[elbow_index], distances = distances)
+}
+```
+
+# SELECT FINAL K
+<!-- Choose final k from MacQueen results.
+     Show all algorithms agree → emphasises robustness, not superiority.
+     Strategy:
+       • Use elbow method on WSS as the primary criterion
+       • Use Silhouette and CH as supporting diagnostics
+       • Check cluster size balance before finalising
+       • Override k manually after inspecting results if needed -->
+
+# 4. Loop over all embeddings
+```{r loop}
+# ── Outer loop: run all three algorithms for each embedding ──────────────────
+for (embedding_path in embedding_paths) {
+
+  if (!file.exists(embedding_path)) {
+    cat("Missing file:", embedding_path, "\n")
+    next
+  }
+
+  cat("\nProcessing:", embedding_path, "\n")
+  embedding_t0 <- Sys.time()
+
+  # Load and z-score the embedding matrix; first column is UserID
+  embeddings       <- read_csv(embedding_path, show_col_types = FALSE)
+  user_ids         <- embeddings[[1]]
+  embedding_matrix <- scale(as.matrix(embeddings[, -1]))
+  embedding_tag    <- tools::file_path_sans_ext(basename(embedding_path))
+
+  # If a full cached result exists for this embedding, load and skip
+  full_file <- file.path("output/kmeans_cache",
+                         paste0("kmeans_full_result_", embedding_tag, ".rds"))
+
+  if (file.exists(full_file)) {
+    cat("Loading FULL cached result for:", embedding_tag, "\n")
+    all_results[[embedding_tag]] <- readRDS(full_file)
+    next
+  }
+
+  # Cache file paths (checked before running to allow partial re-use)
+  kmeans_file <- file.path("output/kmeans_cache", paste0("kmeans_result_", embedding_tag, ".rds"))
+  all_file    <- file.path("output/kmeans_cache", paste0("k_results_all_", embedding_tag, ".rds"))
+  mq_file     <- file.path("output/kmeans_cache", paste0("k_results_mq_",  embedding_tag, ".rds"))
+
+  cat("Running k-means for:", embedding_tag, "\n")
+
+  # Precompute distance matrix once; reused for all silhouette calls
+  dmat <- dist(embedding_matrix)
+
+  embedding_t0 <- Sys.time()
+
+  # Evaluate all three algorithms across k_vals
+  k_eval_hw    <- evaluate_kmeans(embedding_matrix, k_vals, dmat, "Hartigan-Wong")
+  k_eval_lloyd <- evaluate_kmeans(embedding_matrix, k_vals, dmat, "Lloyd")
+  k_eval_mq    <- evaluate_kmeans(embedding_matrix, k_vals, dmat, "MacQueen")
+
+  k_results_hw    <- k_eval_hw$metrics
+  k_results_lloyd <- k_eval_lloyd$metrics
+  k_results_mq    <- k_eval_mq$metrics
+
+  k_models_hw    <- k_eval_hw$models
+  k_models_lloyd <- k_eval_lloyd$models
+  k_models_mq    <- k_eval_mq$models
+
+  # Combined metrics from all algorithms for multi-algorithm plots
+  k_results_all <- bind_rows(k_results_hw, k_results_lloyd, k_results_mq)
+
+  # Select best k from MacQueen metrics (used as the reference algorithm)
+  best_k_sil   <- k_results_mq$k[which.max(k_results_mq$Silhouette)]
+  best_k_ch    <- k_results_mq$k[which.max(k_results_mq$CH)]
+  elbow_info   <- find_elbow_k(k_results_mq$k, k_results_mq$WSS)
+  best_k_elbow <- elbow_info$elbow_k
+  final_k      <- best_k_elbow  # elbow is the primary selection criterion
+
+  # Re-fit final model with high nstart for robustness to random initialisation
+  set.seed(123)
+  kmeans_result <- kmeans(
+    embedding_matrix,
+    centers   = final_k,
+    nstart    = 100,
+    iter.max  = 100,
+    algorithm = "MacQueen"
+  )
+
+  cluster_df    <- data.frame(UserID = user_ids, Cluster = kmeans_result$cluster)
+  final_sil     <- silhouette(kmeans_result$cluster, dmat)
+  final_avg_sil <- mean(final_sil[, 3])
+
+  # PCA projection for visualisation
+  pca           <- prcomp(embedding_matrix)
+  var_explained <- summary(pca)$importance[2, 1:2]
+  pca_df <- data.frame(
+    PC1     = pca$x[, 1],
+    PC2     = pca$x[, 2],
+    Cluster = as.factor(kmeans_result$cluster)
+  )
+
+  runtime_total_sec <- as.numeric(difftime(Sys.time(), embedding_t0, units = "secs"))
+  cluster_sizes     <- table(cluster_df$Cluster)
+
+  # Collect any warning/error messages from the evaluation runs
+  notes_text <- NA_character_
+  if ("notes" %in% names(k_results_all)) {
+    tmp_notes <- unique(na.omit(k_results_all$notes))
+    if (length(tmp_notes) > 0) notes_text <- paste(tmp_notes, collapse = " | ")
+  }
+
+  # One-row summary for cross-embedding and cross-method comparisons
+  summary_row <- data.frame(
+    method            = "kmeans",
+    embedding         = embedding_tag,
+    best_k            = final_k,
+    best_q            = NA,   # not applicable for standard k-means
+    silhouette        = final_avg_sil,
+    CH                = k_results_mq$CH[which.max(k_results_mq$Silhouette)],
+    prob_silh         = NA,
+    cluster_size_min  = min(cluster_sizes),
+    cluster_size_max  = max(cluster_sizes),
+    cluster_size_sd   = sd(as.numeric(cluster_sizes)),
+    runtime_total_sec = runtime_total_sec,
+    notes             = notes_text
+  )
+
+  # Store all artefacts for this embedding in the master list
+  all_results[[embedding_tag]] <- list(
+    embedding_path   = embedding_path,
+    embedding_tag    = embedding_tag,
+    embedding_matrix = embedding_matrix,
+    user_ids         = user_ids,
+    dmat             = dmat,
+    k_models_hw      = k_models_hw,
+    k_models_lloyd   = k_models_lloyd,
+    k_models_mq      = k_models_mq,
+    k_results_hw     = k_results_hw,
+    k_results_lloyd  = k_results_lloyd,
+    k_results_mq     = k_results_mq,
+    k_results_all    = k_results_all,
+    best_k_sil       = best_k_sil,
+    best_k_ch        = best_k_ch,
+    best_k_elbow     = best_k_elbow,
+    elbow_distances  = elbow_info$distances,
+    final_k          = final_k,
+    kmeans_result    = kmeans_result,
+    cluster_df       = cluster_df,
+    final_sil        = final_sil,
+    final_avg_sil    = final_avg_sil,
+    pca_df           = pca_df,
+    var_explained    = var_explained,
+    runtime_total_sec = runtime_total_sec,
+    summary_row      = summary_row,
+    # Placeholder fields for optional stability analysis
+    stability_info   = list(
+      seeds_tested      = NA,
+      n_runs            = NA,
+      chosen_k_values   = NA,
+      chosen_q_values   = NA,
+      ari_mean          = NA,
+      ari_sd            = NA,
+      stability_notes   = NA_character_
+    )
+  )
+
+  cat("Saved results for:", embedding_tag, "\n")
+}
+```
+
+# 5. Show results for all embeddings
+```{r results}
+# Print a concise summary for each embedding: k selected by each criterion,
+# final average silhouette, and raw cluster size distribution.
+for (name in names(all_results)) {
+  cat("\n==========", name, "==========\n")
+  cat("Best k by elbow:",      all_results[[name]]$best_k_elbow, "\n")
+  cat("Best k by silhouette:", all_results[[name]]$best_k_sil,   "\n")
+  cat("Best k by CH:",         all_results[[name]]$best_k_ch,    "\n")
+  cat("Final average silhouette:", all_results[[name]]$final_avg_sil, "\n")
+  cat("Cluster sizes:\n")
+  print(table(all_results[[name]]$cluster_df$Cluster))
+}
+```
+
+# 6. Plot tuning results for all embeddings
+```{r plots}
+# Three diagnostic plots per embedding: Silhouette, CH, and WSS with the
+# elbow k marked by a dashed vertical line.
+for (name in names(all_results)) {
+  res <- all_results[[name]]
+
+  # ── Silhouette by k (all algorithms) ────────────────────────────────────
+  p1 <- ggplot(res$k_results_all, aes(x = k, y = Silhouette, color = Algorithm)) +
+    geom_line() + geom_point() + theme_minimal() +
+    labs(title = paste("Silhouette by k -", name))
+
+  print(p1)
+  ggsave(file.path("output/kmeans_plots", paste0("silhouette_", name, ".png")),
+         p1, width = 9, height = 6, dpi = 120)
+
+  # ── Calinski-Harabasz by k (all algorithms) ──────────────────────────────
+  p2 <- ggplot(res$k_results_all, aes(x = k, y = CH, color = Algorithm)) +
+    geom_line() + geom_point() + theme_minimal() +
+    labs(title = paste("CH by k -", name))
+
+  print(p2)
+  ggsave(file.path("output/kmeans_plots", paste0("ch_", name, ".png")),
+         p2, width = 9, height = 6, dpi = 120)
+
+  # ── WSS elbow plot with elbow k annotated ───────────────────────────────
+  p3 <- ggplot(res$k_results_all, aes(x = k, y = WSS, color = Algorithm)) +
+    geom_line() + geom_point() +
+    geom_vline(xintercept = res$best_k_elbow, linetype = "dashed",
+               color = "black", linewidth = 1) +
+    annotate("text", x = res$best_k_elbow,
+             y = max(res$k_results_all$WSS, na.rm = TRUE),
+             label = paste("Elbow k =", res$best_k_elbow),
+             vjust = -0.5, color = "black") +
+    theme_minimal() +
+    labs(title = paste("WSS by k (Elbow Method) -", name))
+
+  print(p3)
+  ggsave(file.path("output/kmeans_plots", paste0("wss_", name, ".png")),
+         p3, width = 9, height = 6, dpi = 120)
+}
+```
+
+# 7. Plot PCA for all embeddings
+```{r pca}
+# Project each embedding's final cluster assignments onto the first two
+# principal components, coloured by cluster. Axis labels show % variance.
+for (name in names(all_results)) {
+  res <- all_results[[name]]
+
+  p_pca <- ggplot(res$pca_df, aes(x = PC1, y = PC2, color = Cluster)) +
+    geom_point(alpha = 0.6) + theme_minimal() +
+    labs(
+      title = paste("K-Means Clusters (PCA Projection) -", name,
+                    "k =", res$final_k),
+      x = paste0("PC1 (", round(100 * res$var_explained[1], 1), "%)"),
+      y = paste0("PC2 (", round(100 * res$var_explained[2], 1), "%)")
+    )
+
+  print(p_pca)
+  ggsave(
+    file.path("output/kmeans_plots", paste0("pca_", name, "_k", res$final_k, ".png")),
+    p_pca, width = 9, height = 6, dpi = 120
+  )
+}
+```
+
+# 8. Choose best overall embedding
+```{r choose}
+# Collect the best-parameter row from every embedding and select the single
+# best overall model: highest Silhouette at the elbow k, then highest CH max.
+all_best <- lapply(all_results, function(res) {
+  data.frame(
+    embedding           = res$embedding_tag,
+    best_k              = res$final_k,
+    Elbow_k             = res$best_k_elbow,
+    Silhouette_at_elbow = res$final_avg_sil,
+    CH_max              = max(res$k_results_mq$CH, na.rm = TRUE)
+  )
+})
+
+all_best_df <- bind_rows(all_best)
+print(all_best_df)
+
+best_overall_index <- with(all_best_df, order(-Silhouette_at_elbow, -CH_max))[1]
+best_overall       <- all_best_df[best_overall_index, ]
+print(best_overall)
+
+# Pull full result for the winning embedding for use in downstream notebooks
+best_name       <- best_overall$embedding
+best_res        <- all_results[[best_name]]
+best_kmeans     <- best_res$kmeans_result
+best_cluster_df <- best_res$cluster_df
+best_pca_df     <- best_res$pca_df
+best_final_k    <- best_res$final_k
+```
+
+# 9. Save per-embedding results
+```{r save}
+# Persist all artefacts for downstream use and reproducibility:
+#   • cluster assignment CSVs        (UserID → Cluster)
+#   • k-selection metric CSVs        (all algorithms, all k values)
+#   • serialised model objects       (kmeans_result, k_models_*)
+#   • serialised full result         (complete result list for reloading)
+
+for (name in names(all_results)) {
+  res <- all_results[[name]]
+
+  # Cluster assignments for this embedding's final model
+  write.csv(
+    res$cluster_df,
+    file      = file.path("output/kmeans_results",
+                          paste0("kmeans_clusters_", name, "_k", res$final_k, ".csv")),
+    row.names = FALSE
+  )
+
+  # Combined metrics from all three algorithms
+  write.csv(
+    res$k_results_all,
+    file      = file.path("output/kmeans_results",
+                          paste0("kmeans_k_selection_metrics_all_", name, ".csv")),
+    row.names = FALSE
+  )
+
+  # MacQueen-only metrics (used as the reference for k selection)
+  write.csv(
+    res$k_results_mq,
+    file      = file.path("output/kmeans_results",
+                          paste0("kmeans_k_selection_metrics_macqueen_", name, ".csv")),
+    row.names = FALSE
+  )
+
+  # One-row-per-embedding summary table (written inside the loop;
+  # the final write after the loop overwrites with the complete table)
+  all_summary_df <- bind_rows(lapply(all_results, function(x) x$summary_row))
+  write.csv(
+    all_summary_df,
+    file      = file.path("output/kmeans_results", "kmeans_summary_table.csv"),
+    row.names = FALSE
+  )
+
+  # Serialised final k-means model object
+  saveRDS(
+    res$kmeans_result,
+    file = file.path("output/kmeans_cache", paste0("kmeans_result_", name, ".rds"))
+  )
+
+  # Serialised combined metrics for all algorithms
+  saveRDS(
+    res$k_results_all,
+    file = file.path("output/kmeans_cache", paste0("k_results_all_", name, ".rds"))
+  )
+
+  # Serialised per-algorithm model lists
+  saveRDS(k_models_hw,
+          file = file.path("output/kmeans_cache",
+                           paste0("k_models_hw_", embedding_tag, ".rds")))
+  saveRDS(k_models_lloyd,
+          file = file.path("output/kmeans_cache",
+                           paste0("k_models_lloyd_", embedding_tag, ".rds")))
+  saveRDS(k_models_mq,
+          file = file.path("output/kmeans_cache",
+                           paste0("k_models_mq_", embedding_tag, ".rds")))
+
+  # Serialised full result list (used by comparison notebooks without re-fitting)
+  saveRDS(res,
+          file = file.path("output/kmeans_cache",
+                           paste0("kmeans_full_result_", name, ".rds")))
+}
+
+# Final complete summary table across all embeddings
+all_summary_df <- bind_rows(lapply(all_results, function(x) x$summary_row))
+
+write.csv(
+  all_summary_df,
+  file      = file.path("output/kmeans_results", "kmeans_summary_table.csv"),
+  row.names = FALSE
+)
+```

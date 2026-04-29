@@ -202,7 +202,8 @@ for (embedding_path in embedding_paths) {
           embedding_matrix,
           k_val,
           20,     # maximum EM iterations
-          q_val
+          q_val,
+          nu = 10
         ),
         warning = function(w) {
           results_grid$status[i] <<- "warning"
