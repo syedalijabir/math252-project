@@ -9,9 +9,6 @@ date: "May 2, 2026"
 output:
   pdf_document:
     latex_engine: pdflatex
-    number_sections: true
-    toc: true
-    toc_depth: 2
 fontsize: 11pt
 geometry: margin=1in
 header-includes:

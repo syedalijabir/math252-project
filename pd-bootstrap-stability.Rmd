@@ -1,0 +1,394 @@
+---
+title: "MovieLens 1M: Bootstrap Stability for PD Clustering"
+author: ""
+date: "`r format(Sys.Date())`"
+output:
+  pdf_document: default
+fontsize: 11pt
+geometry: margin=1in
+---
+
+<!--
+================================================================================
+  GOAL
+  ----
+  Assess the stability of PD Clustering on MovieLens 1M user embeddings
+  (64, 128, 256 dimensions) across k = 2:4 clusters, using bootstrap
+  resampling. For each (embedding, k) combination, PDC is re-fitted on
+  n_boot subsampled replicates and compared to the full-data reference
+  partition via Adjusted Rand Index (ARI).
+
+  HOW IT WORKS
+  ------------
+  1. Settings   – Define embedding paths, k values, and bootstrap parameters.
+                  All tuning knobs are in one place for easy adjustment.
+  2. Helpers    – Utility functions for loading the cached best PD result,
+                  drawing bootstrap samples, computing ARI against the
+                  reference partition, and computing Silhouette / CH on the
+                  bootstrap sample.
+  3. Main loop  – For each (embedding, k):
+                    a. Load the reference PD partition from cache.
+                    b. If a bootstrap cache exists, load it; otherwise run
+                       n_boot replicates, each on a random sample_fraction
+                       subsample of users, and save the result.
+                    c. Summarise each replicate's ARI, Silhouette, and CH.
+  4. Output     – Bind summaries into one data frame, print, and write to CSV.
+  5. Plot       – Line plot of mean bootstrap ARI by k, faceted by embedding.
+  6. Inspect    – Print per-replicate detail for one (embedding, k) pair.
+
+  RUNTIME BUDGET (basic Dell PC, ~2 hr target)
+  ---------------------------------------------
+  3 embeddings × 3 k values × 15 bootstraps = 135 PDC fits.
+  Each fit runs on 30% of ~6 000 users (≈ 1 800 rows).
+  Estimated fit time per replicate: ~10–30 s depending on dimensionality.
+  Worst-case total: 135 × 30 s ≈ 67 min. Well within the 2-hour window.
+
+  To speed up further: reduce n_boot or sample_fraction.
+  To improve precision: increase n_boot (adds ~30 s per additional replicate).
+================================================================================
+-->
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo    = TRUE,
+  warning = FALSE,
+  message = FALSE,
+  fig.width  = 9,
+  fig.height = 6,
+  dpi = 120
+)
+set.seed(42)
+```
+
+# 1. Requirements
+```{r requirements}
+required_packages <- c(
+  "readr", "dplyr", "tidyr", "ggplot2",
+  "mclust", "cluster", "clusterCrit", "FPDclustering"
+)
+
+installed    <- rownames(installed.packages())
+missing_pkgs <- setdiff(required_packages, installed)
+
+if (length(missing_pkgs) > 0) {
+  install.packages(missing_pkgs)
+}
+
+library(readr)
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(mclust)        # adjustedRandIndex()
+library(cluster)       # silhouette()
+library(clusterCrit)   # intCriteria() for Calinski-Harabasz
+library(FPDclustering) # PDC()
+```
+
+# 2. Settings
+```{r settings}
+# ------------------------------------------------------------
+# SETTINGS — all tuning knobs live here
+# ------------------------------------------------------------
+
+# Embedding files to assess
+embedding_paths <- c(
+  "output/embeddings/user_embeddings_64.csv",
+  "output/embeddings/user_embeddings_128.csv",
+  "output/embeddings/user_embeddings_256.csv"
+)
+
+# k values to test
+k_to_compare <- c(2, 3, 4)
+
+# ── Bootstrap parameters ────────────────────────────────────────────────────
+n_boot            <- 15    # number of bootstrap replicates
+bootstrap_replace <- TRUE  # sample with replacement
+sample_fraction   <- 0.30  # fit each replicate on 30% of users
+
+set.seed(123)  # reproducible bootstrap draws
+
+# Output directories
+dir.create("output/bootstrap_stability_results", recursive = TRUE, showWarnings = FALSE)
+dir.create("output/bootstrap_stability_cache",   recursive = TRUE, showWarnings = FALSE)
+```
+
+# 3. Helpers
+```{r helpers}
+# ------------------------------------------------------------
+# HELPERS
+# ------------------------------------------------------------
+
+# Load the cached PD result for one (embedding_tag, k) combination.
+# Returns NULL if no cache file is found.
+load_cached_pd_for_k <- function(embedding_tag, k_val,
+                                 cache_dir = "output/pd_cache") {
+  cache_file <- file.path(
+    cache_dir,
+    paste0("pd_", embedding_tag, "_k", k_val, ".rds")
+  )
+
+  if (!file.exists(cache_file)) return(NULL)
+
+  readRDS(cache_file)
+}
+
+# Draw a bootstrap sample of row indices from 1:n.
+# Returns at least 2 indices (required for silhouette and ARI to be defined).
+bootstrap_indices <- function(n, replace = TRUE, fraction = 0.30) {
+  sample(seq_len(n), size = max(2, floor(fraction * n)), replace = replace)
+}
+
+# Compute ARI between the full-data reference labels and the bootstrap labels,
+# restricted to the unique users that appear in the bootstrap sample.
+# Returns NA if fewer than 2 unique users or fewer than 2 distinct clusters.
+bootstrap_ari_vs_reference <- function(reference_labels, boot_labels, sampled_idx) {
+  sampled_unique <- sort(unique(sampled_idx))
+
+  if (length(sampled_unique) < 2) return(NA_real_)
+
+  boot_first_pos     <- match(sampled_unique, sampled_idx)
+  boot_labels_unique <- boot_labels[boot_first_pos]
+  ref_labels_unique  <- reference_labels[sampled_unique]
+
+  if (length(unique(boot_labels_unique)) < 2 ||
+      length(unique(ref_labels_unique))  < 2) {
+    return(NA_real_)
+  }
+
+  adjustedRandIndex(ref_labels_unique, boot_labels_unique)
+}
+
+# Compute average Silhouette Width for a bootstrap sample.
+# Returns NA if fewer than 2 distinct clusters.
+compute_avg_silhouette <- function(x, labels) {
+  if (length(unique(labels)) < 2) return(NA_real_)
+  dmat <- dist(x)
+  sil  <- silhouette(as.integer(labels), dmat)
+  mean(sil[, 3])
+}
+
+# Compute Calinski-Harabasz index for a bootstrap sample.
+# Returns NA if fewer than 2 distinct clusters.
+compute_ch <- function(x, labels) {
+  if (length(unique(labels)) < 2) return(NA_real_)
+  intCriteria(
+    traj = x,
+    part = as.integer(labels),
+    crit = "Calinski_Harabasz"
+  )$calinski_harabasz
+}
+```
+
+# 4. Main bootstrap loop
+```{r main}
+# ------------------------------------------------------------
+# MAIN LOOP — PD Clustering only
+# ------------------------------------------------------------
+
+bootstrap_results <- list()
+
+for (embedding_path in embedding_paths) {
+
+  if (!file.exists(embedding_path)) {
+    cat("Missing embedding file:", embedding_path, "\n")
+    next
+  }
+
+  embedding_tag    <- tools::file_path_sans_ext(basename(embedding_path))
+  cat("\nProcessing:", embedding_tag, "\n")
+
+  # Load and scale the embedding matrix; first column is UserID
+  embeddings       <- read_csv(embedding_path, show_col_types = FALSE)
+  user_ids         <- embeddings[[1]]
+  embedding_matrix <- scale(as.matrix(embeddings[, -1]))
+  n                <- nrow(embedding_matrix)
+
+  for (k_val in k_to_compare) {
+    cat("  Bootstrapping PD Clustering for k =", k_val, "\n")
+
+    # Load the reference (full-data) PD partition from the clustering notebook
+    pd_cached <- load_cached_pd_for_k(
+      embedding_tag = embedding_tag,
+      k_val         = k_val,
+      cache_dir     = "output/pd_cache"
+    )
+
+    if (is.null(pd_cached)) {
+      cat("    Missing PD cache for k =", k_val, "— skipping\n")
+      next
+    }
+
+    pd_reference_labels <- pd_cached$labels
+
+    if (length(pd_reference_labels) != n) {
+      cat("    Label length mismatch for", embedding_tag, "k =", k_val, "— skipping\n")
+      next
+    }
+
+    # Per-(embedding, k) bootstrap cache file
+    boot_cache_file <- file.path(
+      "output/bootstrap_stability_cache",
+      paste0("bootstrap_pd_", embedding_tag, "_k", k_val, ".rds")
+    )
+
+    if (file.exists(boot_cache_file)) {
+      # ── Cache hit: skip re-running all replicates ────────────────────────
+      cat("    Loading cached bootstrap results for", embedding_tag, "k =", k_val, "\n")
+      boot_summary <- readRDS(boot_cache_file)
+
+    } else {
+      # ── Cache miss: run n_boot replicates ────────────────────────────────
+      pd_boot_ari    <- rep(NA_real_, n_boot)
+      pd_boot_sil    <- rep(NA_real_, n_boot)
+      pd_boot_ch     <- rep(NA_real_, n_boot)
+      pd_status      <- rep("ok", n_boot)
+
+      for (b in seq_len(n_boot)) {
+        cat("    Replicate", b, "of", n_boot, "\n")
+
+        # Draw a subsample (30% of users by default)
+        sampled_idx <- bootstrap_indices(
+          n        = n,
+          replace  = bootstrap_replace,
+          fraction = sample_fraction
+        )
+        x_boot <- embedding_matrix[sampled_idx, , drop = FALSE]
+
+        # Fit PDC on the bootstrap subsample.
+        # Errors are caught so one bad replicate does not abort the loop.
+        pd_model_boot <- tryCatch(
+          suppressWarnings(
+            PDC(x_boot, k = k_val)
+          ),
+          error = function(e) {
+            pd_status[b] <<- paste("error:", conditionMessage(e))
+            NULL
+          }
+        )
+
+        if (!is.null(pd_model_boot)) {
+          pd_labels_boot <- pd_model_boot$label
+
+          # ARI vs. full-data reference partition (restricted to sampled users)
+          pd_boot_ari[b] <- bootstrap_ari_vs_reference(
+            reference_labels = pd_reference_labels,
+            boot_labels      = pd_labels_boot,
+            sampled_idx      = sampled_idx
+          )
+
+          # Within-bootstrap quality metrics
+          pd_boot_sil[b] <- compute_avg_silhouette(x_boot, pd_labels_boot)
+          pd_boot_ch[b]  <- compute_ch(x_boot, pd_labels_boot)
+        }
+      }
+
+      # Collect everything into a summary object and cache it
+      boot_summary <- list(
+        embedding                = embedding_tag,
+        k                        = k_val,
+        n_boot                   = n_boot,
+        bootstrap_replace        = bootstrap_replace,
+        sample_fraction          = sample_fraction,
+        pd_reference_silhouette  = pd_cached$avg_silhouette,
+        pd_reference_ch          = pd_cached$ch,
+        pd_reference_prob_silh   = pd_cached$prob_silh,
+        pd_boot_ari              = pd_boot_ari,
+        pd_boot_sil              = pd_boot_sil,
+        pd_boot_ch               = pd_boot_ch,
+        pd_status                = pd_status
+      )
+
+      saveRDS(boot_summary, boot_cache_file)
+    }
+
+    # Summarise this (embedding, k) into one row for the final table
+    bootstrap_results[[length(bootstrap_results) + 1]] <- data.frame(
+      embedding                    = boot_summary$embedding,
+      k                            = boot_summary$k,
+      n_boot                       = boot_summary$n_boot,
+      sample_fraction              = boot_summary$sample_fraction,
+      pd_reference_silhouette      = boot_summary$pd_reference_silhouette,
+      pd_reference_ch              = boot_summary$pd_reference_ch,
+      pd_reference_prob_silh       = boot_summary$pd_reference_prob_silh,
+      pd_bootstrap_ari_mean        = mean(boot_summary$pd_boot_ari,   na.rm = TRUE),
+      pd_bootstrap_ari_sd          = sd(boot_summary$pd_boot_ari,     na.rm = TRUE),
+      pd_bootstrap_ari_median      = median(boot_summary$pd_boot_ari, na.rm = TRUE),
+      pd_bootstrap_sil_mean        = mean(boot_summary$pd_boot_sil,   na.rm = TRUE),
+      pd_bootstrap_ch_mean         = mean(boot_summary$pd_boot_ch,    na.rm = TRUE),
+      pd_valid_boot                = sum(is.finite(boot_summary$pd_boot_ari)),
+      stringsAsFactors             = FALSE
+    )
+  }
+}
+```
+
+# 5. Final table
+```{r final}
+# ------------------------------------------------------------
+# FINAL TABLE
+# ------------------------------------------------------------
+bootstrap_results_df <- bind_rows(bootstrap_results) %>%
+  arrange(embedding, k)
+
+print(bootstrap_results_df)
+
+write.csv(
+  bootstrap_results_df,
+  file      = file.path(
+    "output/bootstrap_stability_results",
+    "bootstrap_stability_pd_summary.csv"
+  ),
+  row.names = FALSE
+)
+```
+
+# 6. Plot bootstrap stability
+```{r plot-bootstrap-stability}
+# Line plot of mean bootstrap ARI by k, faceted by embedding.
+# Higher ARI = partitions on subsamples closely match the full-data partition.
+ggplot(bootstrap_results_df, aes(x = k, y = pd_bootstrap_ari_mean)) +
+  geom_line(linewidth = 1, color = "steelblue") +
+  geom_point(size = 2,    color = "steelblue") +
+  geom_errorbar(
+    aes(
+      ymin = pd_bootstrap_ari_mean - pd_bootstrap_ari_sd,
+      ymax = pd_bootstrap_ari_mean + pd_bootstrap_ari_sd
+    ),
+    width = 0.15, color = "steelblue", alpha = 0.6
+  ) +
+  facet_wrap(~ embedding, scales = "free_y") +
+  theme_minimal() +
+  labs(
+    title = "PD Clustering Bootstrap Stability by Embedding and k",
+    x     = "Number of clusters (k)",
+    y     = "Mean bootstrap ARI (± 1 SD)"
+  )
+```
+
+# 7. Inspect one cached bootstrap result
+```{r inspect-one-bootstrap-run}
+# Change these two values to inspect a different (embedding, k) pair
+embedding_tag <- "user_embeddings_128"
+k_val         <- 3
+
+cache_file <- file.path(
+  "output/bootstrap_stability_cache",
+  paste0("bootstrap_pd_", embedding_tag, "_k", k_val, ".rds")
+)
+
+if (file.exists(cache_file)) {
+  boot_obj <- readRDS(cache_file)
+
+  inspect_df <- data.frame(
+    replicate  = seq_len(boot_obj$n_boot),
+    pd_ari     = boot_obj$pd_boot_ari,
+    pd_sil     = boot_obj$pd_boot_sil,
+    pd_ch      = boot_obj$pd_boot_ch,
+    pd_status  = boot_obj$pd_status
+  )
+
+  print(inspect_df)
+} else {
+  cat("No bootstrap cache found for", embedding_tag, "k =", k_val, "\n")
+}
+```
