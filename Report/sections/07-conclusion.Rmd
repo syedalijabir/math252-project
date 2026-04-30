@@ -1,0 +1,7 @@
+# Conclusion and Future Work
+
+This project studies clustering on learned user embeddings derived from the MovieLens 1M dataset. By comparing embeddings of dimensions 64, 128, and 256 across four clustering methods---k-means, PD clustering, reduced k-means, and FPDC---the analysis evaluates how representation size and clustering method affect unsupervised structure discovery.
+
+The study brings together partition-based clustering, dimension reduction, latent-factor methods, and cluster validation within a representation-learning framework. Although recommendation performance is not evaluated, the resulting cluster structure may still be relevant to downstream tasks such as personalization, interpretation, and content organization.
+
+Future work could extend the analysis by incorporating additional clustering methods covered in the course, such as spectral clustering, fuzzy clustering, model-based mixture methods, or clustering with covariates. Another extension would be to include richer user or movie metadata in order to study clustering in augmented feature spaces. It would also be useful to compare MLP-based embeddings with embeddings learned through alternative architectures such as autoencoders or other latent-variable models.

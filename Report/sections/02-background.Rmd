@@ -1,0 +1,65 @@
+# Background
+
+Clustering partitions observations into groups according to similarity or distance. In this study, clustering is performed in learned embedding spaces, so the geometry of the representation is central to the quality of the resulting partitions.
+
+Among partition-based methods, k-means provides a natural baseline because it is simple, efficient, and widely used. The method partitions the observations into a fixed number of clusters by minimizing within-cluster variation. Its objective is the within-cluster sum of squares:
+
+$$
+\min_{C_1,\dots,C_K} \sum_{j=1}^{K} \sum_{x_i \in C_j} \lVert x_i - \mu_j \rVert^2
+$$
+
+where $\mu_j$ is the centroid of cluster $C_j$. K-means works best when clusters are roughly spherical and similar in size, but it is sensitive to initialization, scaling, and outliers.
+
+Probabilistic distance (PD) clustering replaces hard assignments with probabilistic memberships. Let $d_{ik}$ denote the distance between observation $i$ and cluster center $k$, and let $p_{ik}$ denote the probability that observation $i$ belongs to cluster $k$. PD clustering imposes the condition that $p_{ik} d_{ik}$ is constant across clusters for a fixed observation. As a result, observations closer to a center receive higher membership probabilities, while observations farther away receive lower probabilities. A common form of the PD clustering objective is
+
+$$
+J = \sum_{i=1}^{n} \sum_{k=1}^{K} p_{ik}^{2} d_{ik}
+$$
+
+subject to
+
+$$
+\sum_{k=1}^{K} p_{ik} = 1, \qquad p_{ik} \geq 0,
+$$
+
+where
+
+$$
+d_{ik} = \lVert x_i - c_k \rVert^2.
+$$
+
+Because PD clustering produces soft assignments, it can better accommodate noise and overlapping structure than hard partitioning methods, although it is typically more computationally demanding than k-means.
+
+High-dimensional data pose challenges for clustering because distances become less informative and noise can obscure structure. Reduced k-means and factorial PD clustering address this problem by combining clustering with dimension reduction.
+
+Reduced k-means extends standard k-means by simultaneously estimating a lower-dimensional subspace and a partition in that subspace. Let $X \in \mathbb{R}^{n \times p}$ denote the data matrix, and let $A \in \mathbb{R}^{p \times q}$ be an orthonormal projection matrix with $q < p$. Reduced k-means minimizes
+
+$$
+\min_{C_1,\dots,C_K,\,A} \sum_{j=1}^{K} \sum_{x_i \in C_j} \lVert A^{\top} x_i - \mu_j \rVert^2
+$$
+
+where $\mu_j$ is the centroid of cluster $j$ in the reduced $q$-dimensional space. By estimating the projection and the partition jointly, reduced k-means can recover cluster structure concentrated in a lower-dimensional subspace.
+
+Factorial probabilistic distance clustering extends PD clustering in a similar way. Instead of computing distances in the original feature space, it models the observations through a lower-dimensional latent subspace and jointly estimates the factors and the clustering structure. Let $A \in \mathbb{R}^{p \times q}$ denote a loading matrix and let
+
+$$
+d_{ik}(A) = \lVert A^{\top} x_i - c_k \rVert^2
+$$
+
+be the distance in the reduced space. The FPDC objective can be written as
+
+$$
+\min_{p_{ik},\,c_k,\,A} \sum_{i=1}^{n} \sum_{k=1}^{K} p_{ik}^{2} d_{ik}(A)
+$$
+
+subject to
+
+$$
+\sum_{k=1}^{K} p_{ik} = 1, \qquad p_{ik} \geq 0,
+$$
+
+together with constraints on $A$, such as orthonormality. By combining soft assignments with dimension reduction, FPDC can capture latent structure while remaining robust to overlap and noise.
+
+In addition to clustering quality, computational efficiency is an important consideration in high-dimensional settings. Runtime and memory usage generally increase with the number of observations and the dimension of the feature space. Methods that reduce dimension can lower storage requirements and per-iteration cost, but these gains may be offset by the cost of estimating the subspace itself. For that reason, this study considers computational scalability alongside clustering quality.
+
+Because clustering is unsupervised, validation relies on internal criteria, stability, and interpretability rather than labeled outcomes. The evaluation therefore uses multiple criteria rather than a single metric.

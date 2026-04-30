@@ -1,0 +1,13 @@
+# Results
+
+Structure:
+
+1. Effect of embedding size: compare 64 vs. 128 vs. 256.
+2. Algorithm comparison: k-means vs. PD vs. reduced k-means vs. FPDC.
+3. Best model selection based on validation metrics.
+
+[ADD LATER: ALL NUMERIC RESULTS.]
+
+[ADD LATER: TABLES + PLOTS.]
+
+[ADD LATER: OBSERVATIONS (E.G., "HIGHER DIMENSION IMPROVES SEPARATION BUT INCREASES VARIANCE").]

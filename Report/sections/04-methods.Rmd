@@ -1,0 +1,77 @@
+# Methods and Experimental Setup
+
+## Embeddings
+
+The methodology consists of two stages. First, dense latent representations are learned from the MovieLens 1M data using an MLP-based embedding model. Second, clustering procedures are applied to those embeddings to determine which combinations of embedding dimension and clustering method yield the strongest grouping structure.
+
+The representation-learning component produces embeddings of dimensions 64, 128, and 256. These dimensions are compared to evaluate how representation size affects clustering quality. Lower-dimensional embeddings may encourage more compact and stable structure, while higher-dimensional embeddings may capture subtler variation at the cost of greater complexity.
+
+The exact neural architecture should be documented in the final version of the report. This subsection should specify the input representation, the number and size of hidden layers, activation functions, optimizer, learning rate, batch size, number of training epochs, regularization choices, and the loss function used to train the embeddings. It should also state explicitly that clustering is applied to user embeddings.
+
+[ADD EXACT NEURAL ARCHITECTURE DETAILS.]
+
+[ADD LOSS FUNCTION.]
+
+[ADD OPTIMIZER, LEARNING RATE, BATCH SIZE, EPOCHS, AND REGULARIZATION.]
+
+After the embeddings are learned, clustering is performed separately in each embedding space. The four clustering methods considered are k-means, PD clustering, reduced k-means, and FPDC. The experimental design applies each method to each embedding dimension in order to compare clustering behavior across both representation size and clustering algorithm.
+
+The number of clusters considered, the procedure used to select that value, the initialization strategy, stopping criteria, and the number of repeated runs should all be stated explicitly in the final version. These choices affect both clustering quality and computational cost.
+
+[ADD NUMBER OF CLUSTERS CONSIDERED.]
+
+[ADD CLUSTER-SELECTION PROCEDURE.]
+
+[ADD INITIALIZATION STRATEGIES, STOPPING CRITERIA, AND NUMBER OF REPEATED RUNS.]
+
+Clustering is not performed directly on the raw sparse rating matrix. Instead, the embedding model transforms sparse user--item behavior into a lower-dimensional representation on which clustering is applied.
+
+## Clustering Implementation in R
+
+[NEED CITATIONS]
+
+All clustering analyses were conducted in R using standardized user-embedding matrices derived from the MovieLens data. Embedding files were imported with the `readr` package, and the first column containing user identifiers was separated from the embedding coordinates. The remaining embedding features were converted to a numeric matrix and standardized using `scale()` so that all dimensions contributed comparably to distance-based calculations. Pairwise Euclidean distances were computed using `dist()` and were used in silhouette-based evaluation. Additional data manipulation and plotting were performed with `dplyr` and `ggplot2`, respectively.
+
+For k-means clustering, the implementation used the base R function `kmeans()` from the `stats` package. Candidate numbers of clusters were evaluated over the range
+
+$$
+k \in \{2,\dots,20\}.
+$$
+
+In the tuning stage, k-means was run with `nstart = 10` and `iter.max = 100`, and three algorithmic variants were compared: Hartigan--Wong, Lloyd, and MacQueen. For the final fitted model, k-means was refit with `nstart = 100` and `iter.max = 100` using the default Hartigan--Wong algorithm. Model quality was assessed using total within-cluster sum of squares from the fitted object, average silhouette width computed with `silhouette()` from the `cluster` package, and the Calinski--Harabasz index computed with `intCriteria()` from the `clusterCrit` package. In a separate comparison script, k-means was also run for fixed values
+
+$$
+k \in \{3,4,5,6,7,8,9,10\}
+$$
+
+using `nstart = 100`, `iter.max = 100`, and `algorithm = "MacQueen"` to compare its partitions with reduced k-means using the adjusted Rand index from the `mclust` package.
+
+For reduced k-means, the implementation used the `cluspca()` function from the `clustrd` package. Models were fit over the grid
+
+$$
+k \in \{2,\dots,10\}, \qquad q \in \{2,\dots,6\}.
+$$
+
+Each model was fit as `cluspca(embedding_matrix, nclus = k_val, ndim = q_val, method = "RKM", rotation = "varimax")`. For each $(k,q)$ combination, average silhouette width was computed using `silhouette()` from the `cluster` package and the Calinski--Harabasz index was computed with `intCriteria()` from `clusterCrit`. The best reduced k-means model for each embedding file was selected using the highest silhouette value, and intermediate results were cached to `.rds` files.
+
+Probabilistic distance clustering was implemented in R using the `pdclust()` function on the standardized embedding matrices. Models were fit over the range
+
+$$
+k \in \{2,3,4,5\}
+$$
+
+using Euclidean distance. For each value of $k$, the algorithm produced a matrix of posterior membership probabilities, from which hard cluster assignments were obtained by assigning each observation to the cluster with the highest probability. Cluster centers were estimated internally by the algorithm from these probabilistic assignments. Clustering performance was evaluated using average silhouette width computed with `silhouette()` from the `cluster` package, the Calinski--Harabasz index computed using `intCriteria()` from the `clusterCrit` package, and a probability-based silhouette measure computed with `Silh()`. All fitted models and evaluation metrics were saved to `.rds` files to support reproducibility and avoid recomputation.
+
+For factorial probabilistic distance clustering (FPDC), the implementation used the `FPDC()` function from the `FPDclustering` package. The standardized embedding matrices were evaluated over the grid
+
+$$
+k \in \{2,\dots,8\}, \qquad q \in \{2,\dots,5\}.
+$$
+
+Each model was fit as `FPDC(embedding_matrix, k_val, 20, q_val, nu = 10)`, so the implementation used 20 internal iterations and a tuning parameter fixed at
+
+$$
+\nu = 10.
+$$
+
+For each parameter combination, clustering quality was evaluated using average silhouette width computed from hard labels with `silhouette()` from the `cluster` package, the Calinski--Harabasz index from `clusterCrit`, and the probability-based silhouette returned by `Silh()` from `FPDclustering`. The best FPDC solution for each embedding file was selected using silhouette as the primary criterion and Calinski--Harabasz as a secondary criterion. Each fit was cached to `.rds` files, and summary outputs were written to `.csv` files.

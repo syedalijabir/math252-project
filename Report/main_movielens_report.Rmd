@@ -1,0 +1,81 @@
+---
+title: "Reel Intelligence: MovieLens Clustering"
+subtitle: "Final Project Report, Spring 2026"
+author:
+  - Ali Jabir
+  - Isis Martínez
+  - Susan Peck
+date: "May 2, 2026"
+output:
+  pdf_document:
+    latex_engine: pdflatex
+    number_sections: true
+    toc: true
+    toc_depth: 2
+fontsize: 11pt
+geometry: margin=1in
+header-includes:
+  - \usepackage{amsmath}
+  - \usepackage{amssymb}
+  - \usepackage{booktabs}
+  - \usepackage{longtable}
+  - \usepackage{array}
+  - \usepackage{float}
+  - \usepackage{setspace}
+  - \usepackage{graphicx}
+  - \usepackage{caption}
+  - \usepackage{hyperref}
+bibliography: refs.bib
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = FALSE,
+  warning = FALSE,
+  message = FALSE,
+  fig.width = 8,
+  fig.height = 5.5,
+  dpi = 120
+)
+```
+
+\begin{center}
+\textbf{Clustering Analysis (Math 252)}\\
+Professor: Dr. Cristina Tortora\\
+Department of Computer Science\\
+San Jose State University
+\end{center}
+
+# Abstract
+
+TBD
+
+[NOTE: ADD ANY OTHER INFORMATION NEEDED WITH CODE AND RESULTS LATER]
+
+[ADD 3 DIFFERENT DATASETS]
+
+```{r child="sections/01-introduction.Rmd"}
+```
+
+```{r child="sections/02-background.Rmd"}
+```
+
+```{r child="sections/03-dataset.Rmd"}
+```
+
+```{r child="sections/04-methods.Rmd"}
+```
+
+```{r child="sections/05-evaluation.Rmd"}
+```
+
+```{r child="sections/06-results.Rmd"}
+```
+
+```{r child="sections/07-conclusion.Rmd"}
+```
+
+```{r child="sections/08-appendix.Rmd"}
+```
+
+# References
