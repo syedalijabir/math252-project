@@ -54,7 +54,6 @@ ari_df <- compare_results$ari_df
 ari_summary <- compare_results$ari_summary
 ```
 
-git
 \begin{center}
 \textbf{Clustering Analysis (Math 252)}\\
 Professor: Dr. Cristina Tortora\\
