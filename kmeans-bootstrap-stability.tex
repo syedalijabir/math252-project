@@ -1,0 +1,605 @@
+% Options for packages loaded elsewhere
+\PassOptionsToPackage{unicode}{hyperref}
+\PassOptionsToPackage{hyphens}{url}
+%
+\documentclass[
+  11pt,
+]{article}
+\usepackage{amsmath,amssymb}
+\usepackage{iftex}
+\ifPDFTeX
+  \usepackage[T1]{fontenc}
+  \usepackage[utf8]{inputenc}
+  \usepackage{textcomp} % provide euro and other symbols
+\else % if luatex or xetex
+  \usepackage{unicode-math} % this also loads fontspec
+  \defaultfontfeatures{Scale=MatchLowercase}
+  \defaultfontfeatures[\rmfamily]{Ligatures=TeX,Scale=1}
+\fi
+\usepackage{lmodern}
+\ifPDFTeX\else
+  % xetex/luatex font selection
+\fi
+% Use upquote if available, for straight quotes in verbatim environments
+\IfFileExists{upquote.sty}{\usepackage{upquote}}{}
+\IfFileExists{microtype.sty}{% use microtype if available
+  \usepackage[]{microtype}
+  \UseMicrotypeSet[protrusion]{basicmath} % disable protrusion for tt fonts
+}{}
+\makeatletter
+\@ifundefined{KOMAClassName}{% if non-KOMA class
+  \IfFileExists{parskip.sty}{%
+    \usepackage{parskip}
+  }{% else
+    \setlength{\parindent}{0pt}
+    \setlength{\parskip}{6pt plus 2pt minus 1pt}}
+}{% if KOMA class
+  \KOMAoptions{parskip=half}}
+\makeatother
+\usepackage{xcolor}
+\usepackage[margin=1in]{geometry}
+\usepackage{color}
+\usepackage{fancyvrb}
+\newcommand{\VerbBar}{|}
+\newcommand{\VERB}{\Verb[commandchars=\\\{\}]}
+\DefineVerbatimEnvironment{Highlighting}{Verbatim}{commandchars=\\\{\}}
+% Add ',fontsize=\small' for more characters per line
+\usepackage{framed}
+\definecolor{shadecolor}{RGB}{248,248,248}
+\newenvironment{Shaded}{\begin{snugshade}}{\end{snugshade}}
+\newcommand{\AlertTok}[1]{\textcolor[rgb]{0.94,0.16,0.16}{#1}}
+\newcommand{\AnnotationTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{\textbf{\textit{#1}}}}
+\newcommand{\AttributeTok}[1]{\textcolor[rgb]{0.13,0.29,0.53}{#1}}
+\newcommand{\BaseNTok}[1]{\textcolor[rgb]{0.00,0.00,0.81}{#1}}
+\newcommand{\BuiltInTok}[1]{#1}
+\newcommand{\CharTok}[1]{\textcolor[rgb]{0.31,0.60,0.02}{#1}}
+\newcommand{\CommentTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{\textit{#1}}}
+\newcommand{\CommentVarTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{\textbf{\textit{#1}}}}
+\newcommand{\ConstantTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{#1}}
+\newcommand{\ControlFlowTok}[1]{\textcolor[rgb]{0.13,0.29,0.53}{\textbf{#1}}}
+\newcommand{\DataTypeTok}[1]{\textcolor[rgb]{0.13,0.29,0.53}{#1}}
+\newcommand{\DecValTok}[1]{\textcolor[rgb]{0.00,0.00,0.81}{#1}}
+\newcommand{\DocumentationTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{\textbf{\textit{#1}}}}
+\newcommand{\ErrorTok}[1]{\textcolor[rgb]{0.64,0.00,0.00}{\textbf{#1}}}
+\newcommand{\ExtensionTok}[1]{#1}
+\newcommand{\FloatTok}[1]{\textcolor[rgb]{0.00,0.00,0.81}{#1}}
+\newcommand{\FunctionTok}[1]{\textcolor[rgb]{0.13,0.29,0.53}{\textbf{#1}}}
+\newcommand{\ImportTok}[1]{#1}
+\newcommand{\InformationTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{\textbf{\textit{#1}}}}
+\newcommand{\KeywordTok}[1]{\textcolor[rgb]{0.13,0.29,0.53}{\textbf{#1}}}
+\newcommand{\NormalTok}[1]{#1}
+\newcommand{\OperatorTok}[1]{\textcolor[rgb]{0.81,0.36,0.00}{\textbf{#1}}}
+\newcommand{\OtherTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{#1}}
+\newcommand{\PreprocessorTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{\textit{#1}}}
+\newcommand{\RegionMarkerTok}[1]{#1}
+\newcommand{\SpecialCharTok}[1]{\textcolor[rgb]{0.81,0.36,0.00}{\textbf{#1}}}
+\newcommand{\SpecialStringTok}[1]{\textcolor[rgb]{0.31,0.60,0.02}{#1}}
+\newcommand{\StringTok}[1]{\textcolor[rgb]{0.31,0.60,0.02}{#1}}
+\newcommand{\VariableTok}[1]{\textcolor[rgb]{0.00,0.00,0.00}{#1}}
+\newcommand{\VerbatimStringTok}[1]{\textcolor[rgb]{0.31,0.60,0.02}{#1}}
+\newcommand{\WarningTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{\textbf{\textit{#1}}}}
+\usepackage{graphicx}
+\makeatletter
+\newsavebox\pandoc@box
+\newcommand*\pandocbounded[1]{% scales image to fit in text height/width
+  \sbox\pandoc@box{#1}%
+  \Gscale@div\@tempa{\textheight}{\dimexpr\ht\pandoc@box+\dp\pandoc@box\relax}%
+  \Gscale@div\@tempb{\linewidth}{\wd\pandoc@box}%
+  \ifdim\@tempb\p@<\@tempa\p@\let\@tempa\@tempb\fi% select the smaller of both
+  \ifdim\@tempa\p@<\p@\scalebox{\@tempa}{\usebox\pandoc@box}%
+  \else\usebox{\pandoc@box}%
+  \fi%
+}
+% Set default figure placement to htbp
+\def\fps@figure{htbp}
+\makeatother
+\setlength{\emergencystretch}{3em} % prevent overfull lines
+\providecommand{\tightlist}{%
+  \setlength{\itemsep}{0pt}\setlength{\parskip}{0pt}}
+\setcounter{secnumdepth}{-\maxdimen} % remove section numbering
+\usepackage{bookmark}
+\IfFileExists{xurl.sty}{\usepackage{xurl}}{} % add URL line breaks if available
+\urlstyle{same}
+\hypersetup{
+  pdftitle={MovieLens 1M: Bootstrap Stability for K-Means},
+  hidelinks,
+  pdfcreator={LaTeX via pandoc}}
+
+\title{MovieLens 1M: Bootstrap Stability for K-Means}
+\author{}
+\date{\vspace{-2.5em}2026-05-01}
+
+\begin{document}
+\maketitle
+
+\section{1. Requirements}\label{requirements}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{required\_packages }\OtherTok{\textless{}{-}} \FunctionTok{c}\NormalTok{(}
+  \StringTok{"readr"}\NormalTok{, }\StringTok{"dplyr"}\NormalTok{, }\StringTok{"tidyr"}\NormalTok{, }\StringTok{"ggplot2"}\NormalTok{,}
+  \StringTok{"mclust"}\NormalTok{, }\StringTok{"cluster"}\NormalTok{, }\StringTok{"clusterCrit"}
+\NormalTok{)}
+
+\NormalTok{installed    }\OtherTok{\textless{}{-}} \FunctionTok{rownames}\NormalTok{(}\FunctionTok{installed.packages}\NormalTok{())}
+\NormalTok{missing\_pkgs }\OtherTok{\textless{}{-}} \FunctionTok{setdiff}\NormalTok{(required\_packages, installed)}
+
+\ControlFlowTok{if}\NormalTok{ (}\FunctionTok{length}\NormalTok{(missing\_pkgs) }\SpecialCharTok{\textgreater{}} \DecValTok{0}\NormalTok{) \{}
+  \FunctionTok{install.packages}\NormalTok{(missing\_pkgs)}
+\NormalTok{\}}
+
+\FunctionTok{library}\NormalTok{(readr)}
+\FunctionTok{library}\NormalTok{(dplyr)}
+\FunctionTok{library}\NormalTok{(tidyr)}
+\FunctionTok{library}\NormalTok{(ggplot2)}
+\FunctionTok{library}\NormalTok{(mclust)       }\CommentTok{\# adjustedRandIndex()}
+\FunctionTok{library}\NormalTok{(cluster)      }\CommentTok{\# silhouette()}
+\FunctionTok{library}\NormalTok{(clusterCrit)  }\CommentTok{\# intCriteria() for Calinski{-}Harabasz}
+\end{Highlighting}
+\end{Shaded}
+
+\section{2. Settings}\label{settings}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\CommentTok{\# {-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}}
+\CommentTok{\# SETTINGS — all tuning knobs live here}
+\CommentTok{\# {-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}}
+
+\CommentTok{\# Embedding files to assess}
+\NormalTok{embedding\_paths }\OtherTok{\textless{}{-}} \FunctionTok{c}\NormalTok{(}
+  \StringTok{"output/embeddings/user\_embeddings\_64.csv"}\NormalTok{,}
+  \StringTok{"output/embeddings/user\_embeddings\_128.csv"}\NormalTok{,}
+  \StringTok{"output/embeddings/user\_embeddings\_256.csv"}
+\NormalTok{)}
+
+\CommentTok{\# k values to test}
+\NormalTok{k\_to\_compare }\OtherTok{\textless{}{-}} \FunctionTok{c}\NormalTok{(}\DecValTok{2}\NormalTok{, }\DecValTok{3}\NormalTok{, }\DecValTok{4}\NormalTok{)}
+
+\CommentTok{\# ── Bootstrap parameters ────────────────────────────────────────────────────}
+\NormalTok{n\_boot            }\OtherTok{\textless{}{-}} \DecValTok{15}    \CommentTok{\# number of bootstrap replicates}
+\NormalTok{bootstrap\_replace }\OtherTok{\textless{}{-}} \ConstantTok{TRUE}  \CommentTok{\# sample with replacement}
+\NormalTok{sample\_fraction   }\OtherTok{\textless{}{-}} \FloatTok{0.30}  \CommentTok{\# fit each replicate on 30\% of users}
+
+\CommentTok{\# ── K{-}Means hyperparameters ─────────────────────────────────────────────────}
+\NormalTok{kmeans\_algorithm  }\OtherTok{\textless{}{-}} \StringTok{"MacQueen"}  \CommentTok{\# algorithm used in the reference run}
+\NormalTok{kmeans\_nstart     }\OtherTok{\textless{}{-}} \DecValTok{10}          \CommentTok{\# number of random starts per replicate}
+\NormalTok{kmeans\_iter\_max   }\OtherTok{\textless{}{-}} \DecValTok{100}         \CommentTok{\# maximum iterations}
+
+\FunctionTok{set.seed}\NormalTok{(}\DecValTok{123}\NormalTok{)  }\CommentTok{\# reproducible bootstrap draws}
+
+\CommentTok{\# Output directories}
+\FunctionTok{dir.create}\NormalTok{(}\StringTok{"output/bootstrap\_stability\_results"}\NormalTok{, }\AttributeTok{recursive =} \ConstantTok{TRUE}\NormalTok{, }\AttributeTok{showWarnings =} \ConstantTok{FALSE}\NormalTok{)}
+\FunctionTok{dir.create}\NormalTok{(}\StringTok{"output/bootstrap\_stability\_cache"}\NormalTok{,   }\AttributeTok{recursive =} \ConstantTok{TRUE}\NormalTok{, }\AttributeTok{showWarnings =} \ConstantTok{FALSE}\NormalTok{)}
+\end{Highlighting}
+\end{Shaded}
+
+\section{3. Helpers}\label{helpers}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\CommentTok{\# {-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}}
+\CommentTok{\# HELPERS}
+\CommentTok{\# {-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}}
+
+\CommentTok{\# Load the best cached K{-}Means result for one (embedding\_tag, k) combination.}
+\CommentTok{\# The reference run is stored as kmeans\_result\_\textless{}tag\textgreater{}.rds; the final k used}
+\CommentTok{\# is read from the full result object.}
+\CommentTok{\# Returns NULL if no cache file is found.}
+\NormalTok{load\_cached\_kmeans\_for\_k }\OtherTok{\textless{}{-}} \ControlFlowTok{function}\NormalTok{(embedding\_tag, k\_val,}
+                                     \AttributeTok{cache\_dir =} \StringTok{"output/kmeans\_cache"}\NormalTok{) \{}
+\NormalTok{  full\_file }\OtherTok{\textless{}{-}} \FunctionTok{file.path}\NormalTok{(cache\_dir, }\FunctionTok{paste0}\NormalTok{(}\StringTok{"kmeans\_full\_result\_"}\NormalTok{, embedding\_tag, }\StringTok{".rds"}\NormalTok{))}
+
+  \ControlFlowTok{if}\NormalTok{ (}\SpecialCharTok{!}\FunctionTok{file.exists}\NormalTok{(full\_file)) }\FunctionTok{return}\NormalTok{(}\ConstantTok{NULL}\NormalTok{)}
+
+\NormalTok{  full\_result }\OtherTok{\textless{}{-}} \FunctionTok{readRDS}\NormalTok{(full\_file)}
+
+  \CommentTok{\# Only return if the cached final\_k matches the requested k\_val}
+  \ControlFlowTok{if}\NormalTok{ (full\_result}\SpecialCharTok{$}\NormalTok{final\_k }\SpecialCharTok{!=}\NormalTok{ k\_val) }\FunctionTok{return}\NormalTok{(}\ConstantTok{NULL}\NormalTok{)}
+
+\NormalTok{  full\_result}
+\NormalTok{\}}
+
+\CommentTok{\# Draw a bootstrap sample of row indices from 1:n.}
+\CommentTok{\# Returns at least 2 indices (required for silhouette and ARI to be defined).}
+\NormalTok{bootstrap\_indices }\OtherTok{\textless{}{-}} \ControlFlowTok{function}\NormalTok{(n, }\AttributeTok{replace =} \ConstantTok{TRUE}\NormalTok{, }\AttributeTok{fraction =} \FloatTok{0.30}\NormalTok{) \{}
+  \FunctionTok{sample}\NormalTok{(}\FunctionTok{seq\_len}\NormalTok{(n), }\AttributeTok{size =} \FunctionTok{max}\NormalTok{(}\DecValTok{2}\NormalTok{, }\FunctionTok{floor}\NormalTok{(fraction }\SpecialCharTok{*}\NormalTok{ n)), }\AttributeTok{replace =}\NormalTok{ replace)}
+\NormalTok{\}}
+
+\CommentTok{\# Compute ARI between the full{-}data reference labels and the bootstrap labels,}
+\CommentTok{\# restricted to the unique users that appear in the bootstrap sample.}
+\CommentTok{\# Returns NA if fewer than 2 unique users or fewer than 2 distinct clusters.}
+\NormalTok{bootstrap\_ari\_vs\_reference }\OtherTok{\textless{}{-}} \ControlFlowTok{function}\NormalTok{(reference\_labels, boot\_labels, sampled\_idx) \{}
+\NormalTok{  sampled\_unique }\OtherTok{\textless{}{-}} \FunctionTok{sort}\NormalTok{(}\FunctionTok{unique}\NormalTok{(sampled\_idx))}
+
+  \ControlFlowTok{if}\NormalTok{ (}\FunctionTok{length}\NormalTok{(sampled\_unique) }\SpecialCharTok{\textless{}} \DecValTok{2}\NormalTok{) }\FunctionTok{return}\NormalTok{(}\ConstantTok{NA\_real\_}\NormalTok{)}
+
+\NormalTok{  boot\_first\_pos     }\OtherTok{\textless{}{-}} \FunctionTok{match}\NormalTok{(sampled\_unique, sampled\_idx)}
+\NormalTok{  boot\_labels\_unique }\OtherTok{\textless{}{-}}\NormalTok{ boot\_labels[boot\_first\_pos]}
+\NormalTok{  ref\_labels\_unique  }\OtherTok{\textless{}{-}}\NormalTok{ reference\_labels[sampled\_unique]}
+
+  \ControlFlowTok{if}\NormalTok{ (}\FunctionTok{length}\NormalTok{(}\FunctionTok{unique}\NormalTok{(boot\_labels\_unique)) }\SpecialCharTok{\textless{}} \DecValTok{2} \SpecialCharTok{||}
+      \FunctionTok{length}\NormalTok{(}\FunctionTok{unique}\NormalTok{(ref\_labels\_unique))  }\SpecialCharTok{\textless{}} \DecValTok{2}\NormalTok{) \{}
+    \FunctionTok{return}\NormalTok{(}\ConstantTok{NA\_real\_}\NormalTok{)}
+\NormalTok{  \}}
+
+  \FunctionTok{adjustedRandIndex}\NormalTok{(ref\_labels\_unique, boot\_labels\_unique)}
+\NormalTok{\}}
+
+\CommentTok{\# Compute average Silhouette Width for a bootstrap sample.}
+\CommentTok{\# Returns NA if fewer than 2 distinct clusters.}
+\NormalTok{compute\_avg\_silhouette }\OtherTok{\textless{}{-}} \ControlFlowTok{function}\NormalTok{(x, labels) \{}
+  \ControlFlowTok{if}\NormalTok{ (}\FunctionTok{length}\NormalTok{(}\FunctionTok{unique}\NormalTok{(labels)) }\SpecialCharTok{\textless{}} \DecValTok{2}\NormalTok{) }\FunctionTok{return}\NormalTok{(}\ConstantTok{NA\_real\_}\NormalTok{)}
+\NormalTok{  dmat }\OtherTok{\textless{}{-}} \FunctionTok{dist}\NormalTok{(x)}
+\NormalTok{  sil  }\OtherTok{\textless{}{-}} \FunctionTok{silhouette}\NormalTok{(}\FunctionTok{as.integer}\NormalTok{(labels), dmat)}
+  \FunctionTok{mean}\NormalTok{(sil[, }\DecValTok{3}\NormalTok{])}
+\NormalTok{\}}
+
+\CommentTok{\# Compute Calinski{-}Harabasz index for a bootstrap sample.}
+\CommentTok{\# Returns NA if fewer than 2 distinct clusters.}
+\NormalTok{compute\_ch }\OtherTok{\textless{}{-}} \ControlFlowTok{function}\NormalTok{(x, labels) \{}
+  \ControlFlowTok{if}\NormalTok{ (}\FunctionTok{length}\NormalTok{(}\FunctionTok{unique}\NormalTok{(labels)) }\SpecialCharTok{\textless{}} \DecValTok{2}\NormalTok{) }\FunctionTok{return}\NormalTok{(}\ConstantTok{NA\_real\_}\NormalTok{)}
+  \FunctionTok{intCriteria}\NormalTok{(}
+    \AttributeTok{traj =}\NormalTok{ x,}
+    \AttributeTok{part =} \FunctionTok{as.integer}\NormalTok{(labels),}
+    \AttributeTok{crit =} \StringTok{"Calinski\_Harabasz"}
+\NormalTok{  )}\SpecialCharTok{$}\NormalTok{calinski\_harabasz}
+\NormalTok{\}}
+\end{Highlighting}
+\end{Shaded}
+
+\section{4. Main bootstrap loop}\label{main-bootstrap-loop}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\CommentTok{\# {-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}}
+\CommentTok{\# MAIN LOOP — K{-}Means only}
+\CommentTok{\# {-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}}
+
+\NormalTok{bootstrap\_results }\OtherTok{\textless{}{-}} \FunctionTok{list}\NormalTok{()}
+
+\ControlFlowTok{for}\NormalTok{ (embedding\_path }\ControlFlowTok{in}\NormalTok{ embedding\_paths) \{}
+
+  \ControlFlowTok{if}\NormalTok{ (}\SpecialCharTok{!}\FunctionTok{file.exists}\NormalTok{(embedding\_path)) \{}
+    \FunctionTok{cat}\NormalTok{(}\StringTok{"Missing embedding file:"}\NormalTok{, embedding\_path, }\StringTok{"}\SpecialCharTok{\textbackslash{}n}\StringTok{"}\NormalTok{)}
+    \ControlFlowTok{next}
+\NormalTok{  \}}
+
+\NormalTok{  embedding\_tag    }\OtherTok{\textless{}{-}}\NormalTok{ tools}\SpecialCharTok{::}\FunctionTok{file\_path\_sans\_ext}\NormalTok{(}\FunctionTok{basename}\NormalTok{(embedding\_path))}
+  \FunctionTok{cat}\NormalTok{(}\StringTok{"}\SpecialCharTok{\textbackslash{}n}\StringTok{Processing:"}\NormalTok{, embedding\_tag, }\StringTok{"}\SpecialCharTok{\textbackslash{}n}\StringTok{"}\NormalTok{)}
+
+  \CommentTok{\# Load and scale the embedding matrix; first column is UserID}
+\NormalTok{  embeddings       }\OtherTok{\textless{}{-}} \FunctionTok{read\_csv}\NormalTok{(embedding\_path, }\AttributeTok{show\_col\_types =} \ConstantTok{FALSE}\NormalTok{)}
+\NormalTok{  user\_ids         }\OtherTok{\textless{}{-}}\NormalTok{ embeddings[[}\DecValTok{1}\NormalTok{]]}
+\NormalTok{  embedding\_matrix }\OtherTok{\textless{}{-}} \FunctionTok{scale}\NormalTok{(}\FunctionTok{as.matrix}\NormalTok{(embeddings[, }\SpecialCharTok{{-}}\DecValTok{1}\NormalTok{]))}
+\NormalTok{  n                }\OtherTok{\textless{}{-}} \FunctionTok{nrow}\NormalTok{(embedding\_matrix)}
+
+  \ControlFlowTok{for}\NormalTok{ (k\_val }\ControlFlowTok{in}\NormalTok{ k\_to\_compare) \{}
+    \FunctionTok{cat}\NormalTok{(}\StringTok{"  Bootstrapping K{-}Means for k ="}\NormalTok{, k\_val, }\StringTok{"}\SpecialCharTok{\textbackslash{}n}\StringTok{"}\NormalTok{)}
+
+    \CommentTok{\# Load the reference (full{-}data) K{-}Means partition from the clustering notebook.}
+    \CommentTok{\# Note: load\_cached\_kmeans\_for\_k returns NULL if cached final\_k != k\_val.}
+    \CommentTok{\# To bootstrap all k values regardless of which k was chosen as final,}
+    \CommentTok{\# we load the full result and read the cluster vector from kmeans\_result directly.}
+\NormalTok{    full\_cache\_file }\OtherTok{\textless{}{-}} \FunctionTok{file.path}\NormalTok{(}
+      \StringTok{"output/kmeans\_cache"}\NormalTok{,}
+      \FunctionTok{paste0}\NormalTok{(}\StringTok{"kmeans\_full\_result\_"}\NormalTok{, embedding\_tag, }\StringTok{".rds"}\NormalTok{)}
+\NormalTok{    )}
+
+    \ControlFlowTok{if}\NormalTok{ (}\SpecialCharTok{!}\FunctionTok{file.exists}\NormalTok{(full\_cache\_file)) \{}
+      \FunctionTok{cat}\NormalTok{(}\StringTok{"    Missing K{-}Means cache for"}\NormalTok{, embedding\_tag, }\StringTok{"— skipping}\SpecialCharTok{\textbackslash{}n}\StringTok{"}\NormalTok{)}
+      \ControlFlowTok{next}
+\NormalTok{    \}}
+
+    \CommentTok{\# Load per{-}k cached model if available; fall back to re{-}fitting reference}
+\NormalTok{    per\_k\_cache }\OtherTok{\textless{}{-}} \FunctionTok{file.path}\NormalTok{(}
+      \StringTok{"output/kmeans\_cache"}\NormalTok{,}
+      \FunctionTok{paste0}\NormalTok{(}\StringTok{"kmeans\_result\_"}\NormalTok{, embedding\_tag, }\StringTok{"\_k"}\NormalTok{, k\_val, }\StringTok{".rds"}\NormalTok{)}
+\NormalTok{    )}
+
+    \ControlFlowTok{if}\NormalTok{ (}\FunctionTok{file.exists}\NormalTok{(per\_k\_cache)) \{}
+\NormalTok{      km\_reference }\OtherTok{\textless{}{-}} \FunctionTok{readRDS}\NormalTok{(per\_k\_cache)}
+\NormalTok{      kmeans\_reference\_labels }\OtherTok{\textless{}{-}}\NormalTok{ km\_reference}\SpecialCharTok{$}\NormalTok{cluster}
+\NormalTok{    \} }\ControlFlowTok{else}\NormalTok{ \{}
+      \CommentTok{\# Re{-}fit reference at this k from the full result\textquotesingle{}s embedding matrix}
+\NormalTok{      full\_result }\OtherTok{\textless{}{-}} \FunctionTok{readRDS}\NormalTok{(full\_cache\_file)}
+      \FunctionTok{set.seed}\NormalTok{(}\DecValTok{123}\NormalTok{)}
+\NormalTok{      km\_reference }\OtherTok{\textless{}{-}} \FunctionTok{kmeans}\NormalTok{(}
+\NormalTok{        full\_result}\SpecialCharTok{$}\NormalTok{embedding\_matrix,}
+        \AttributeTok{centers  =}\NormalTok{ k\_val,}
+        \AttributeTok{nstart   =} \DecValTok{100}\NormalTok{,}
+        \AttributeTok{iter.max =}\NormalTok{ kmeans\_iter\_max,}
+        \AttributeTok{algorithm =}\NormalTok{ kmeans\_algorithm}
+\NormalTok{      )}
+\NormalTok{      kmeans\_reference\_labels }\OtherTok{\textless{}{-}}\NormalTok{ km\_reference}\SpecialCharTok{$}\NormalTok{cluster}
+\NormalTok{    \}}
+
+    \ControlFlowTok{if}\NormalTok{ (}\FunctionTok{length}\NormalTok{(kmeans\_reference\_labels) }\SpecialCharTok{!=}\NormalTok{ n) \{}
+      \FunctionTok{cat}\NormalTok{(}\StringTok{"    Label length mismatch for"}\NormalTok{, embedding\_tag, }\StringTok{"k ="}\NormalTok{, k\_val, }\StringTok{"— skipping}\SpecialCharTok{\textbackslash{}n}\StringTok{"}\NormalTok{)}
+      \ControlFlowTok{next}
+\NormalTok{    \}}
+
+    \CommentTok{\# Reference quality metrics (from full data)}
+\NormalTok{    ref\_dmat   }\OtherTok{\textless{}{-}} \FunctionTok{dist}\NormalTok{(embedding\_matrix)}
+\NormalTok{    ref\_sil    }\OtherTok{\textless{}{-}} \FunctionTok{silhouette}\NormalTok{(}\FunctionTok{as.integer}\NormalTok{(kmeans\_reference\_labels), ref\_dmat)}
+\NormalTok{    ref\_avg\_sil }\OtherTok{\textless{}{-}} \FunctionTok{mean}\NormalTok{(ref\_sil[, }\DecValTok{3}\NormalTok{])}
+\NormalTok{    ref\_ch     }\OtherTok{\textless{}{-}} \FunctionTok{intCriteria}\NormalTok{(}
+      \AttributeTok{traj =}\NormalTok{ embedding\_matrix,}
+      \AttributeTok{part =} \FunctionTok{as.integer}\NormalTok{(kmeans\_reference\_labels),}
+      \AttributeTok{crit =} \StringTok{"Calinski\_Harabasz"}
+\NormalTok{    )}\SpecialCharTok{$}\NormalTok{calinski\_harabasz}
+
+    \CommentTok{\# Per{-}(embedding, k) bootstrap cache file}
+\NormalTok{    boot\_cache\_file }\OtherTok{\textless{}{-}} \FunctionTok{file.path}\NormalTok{(}
+      \StringTok{"output/bootstrap\_stability\_cache"}\NormalTok{,}
+      \FunctionTok{paste0}\NormalTok{(}\StringTok{"bootstrap\_kmeans\_"}\NormalTok{, embedding\_tag, }\StringTok{"\_k"}\NormalTok{, k\_val, }\StringTok{".rds"}\NormalTok{)}
+\NormalTok{    )}
+
+    \ControlFlowTok{if}\NormalTok{ (}\FunctionTok{file.exists}\NormalTok{(boot\_cache\_file)) \{}
+      \CommentTok{\# ── Cache hit: skip re{-}running all replicates ────────────────────────}
+      \FunctionTok{cat}\NormalTok{(}\StringTok{"    Loading cached bootstrap results for"}\NormalTok{, embedding\_tag, }\StringTok{"k ="}\NormalTok{, k\_val, }\StringTok{"}\SpecialCharTok{\textbackslash{}n}\StringTok{"}\NormalTok{)}
+\NormalTok{      boot\_summary }\OtherTok{\textless{}{-}} \FunctionTok{readRDS}\NormalTok{(boot\_cache\_file)}
+
+\NormalTok{    \} }\ControlFlowTok{else}\NormalTok{ \{}
+      \CommentTok{\# ── Cache miss: run n\_boot replicates ────────────────────────────────}
+\NormalTok{      kmeans\_boot\_ari    }\OtherTok{\textless{}{-}} \FunctionTok{rep}\NormalTok{(}\ConstantTok{NA\_real\_}\NormalTok{, n\_boot)}
+\NormalTok{      kmeans\_boot\_sil    }\OtherTok{\textless{}{-}} \FunctionTok{rep}\NormalTok{(}\ConstantTok{NA\_real\_}\NormalTok{, n\_boot)}
+\NormalTok{      kmeans\_boot\_ch     }\OtherTok{\textless{}{-}} \FunctionTok{rep}\NormalTok{(}\ConstantTok{NA\_real\_}\NormalTok{, n\_boot)}
+\NormalTok{      kmeans\_status      }\OtherTok{\textless{}{-}} \FunctionTok{rep}\NormalTok{(}\StringTok{"ok"}\NormalTok{, n\_boot)}
+
+      \ControlFlowTok{for}\NormalTok{ (b }\ControlFlowTok{in} \FunctionTok{seq\_len}\NormalTok{(n\_boot)) \{}
+        \FunctionTok{cat}\NormalTok{(}\StringTok{"    Replicate"}\NormalTok{, b, }\StringTok{"of"}\NormalTok{, n\_boot, }\StringTok{"}\SpecialCharTok{\textbackslash{}n}\StringTok{"}\NormalTok{)}
+
+\NormalTok{        sampled\_idx }\OtherTok{\textless{}{-}} \FunctionTok{bootstrap\_indices}\NormalTok{(}
+          \AttributeTok{n        =}\NormalTok{ n,}
+          \AttributeTok{replace  =}\NormalTok{ bootstrap\_replace,}
+          \AttributeTok{fraction =}\NormalTok{ sample\_fraction}
+\NormalTok{        )}
+\NormalTok{        x\_boot }\OtherTok{\textless{}{-}}\NormalTok{ embedding\_matrix[sampled\_idx, , drop }\OtherTok{=} \ConstantTok{FALSE}\NormalTok{]}
+
+\NormalTok{        km\_boot }\OtherTok{\textless{}{-}} \FunctionTok{tryCatch}\NormalTok{(}
+          \FunctionTok{kmeans}\NormalTok{(}
+\NormalTok{            x\_boot,}
+            \AttributeTok{centers   =}\NormalTok{ k\_val,}
+            \AttributeTok{nstart    =}\NormalTok{ kmeans\_nstart,}
+            \AttributeTok{iter.max  =}\NormalTok{ kmeans\_iter\_max,}
+            \AttributeTok{algorithm =}\NormalTok{ kmeans\_algorithm}
+\NormalTok{          ),}
+          \AttributeTok{error =} \ControlFlowTok{function}\NormalTok{(e) \{}
+\NormalTok{            kmeans\_status[b] }\OtherTok{\textless{}\textless{}{-}} \FunctionTok{paste}\NormalTok{(}\StringTok{"error:"}\NormalTok{, }\FunctionTok{conditionMessage}\NormalTok{(e))}
+            \ConstantTok{NULL}
+\NormalTok{          \}}
+\NormalTok{        )}
+
+        \ControlFlowTok{if}\NormalTok{ (}\SpecialCharTok{!}\FunctionTok{is.null}\NormalTok{(km\_boot)) \{}
+\NormalTok{          km\_labels\_boot }\OtherTok{\textless{}{-}}\NormalTok{ km\_boot}\SpecialCharTok{$}\NormalTok{cluster}
+
+\NormalTok{          kmeans\_boot\_ari[b] }\OtherTok{\textless{}{-}} \FunctionTok{bootstrap\_ari\_vs\_reference}\NormalTok{(}
+            \AttributeTok{reference\_labels =}\NormalTok{ kmeans\_reference\_labels,}
+            \AttributeTok{boot\_labels      =}\NormalTok{ km\_labels\_boot,}
+            \AttributeTok{sampled\_idx      =}\NormalTok{ sampled\_idx}
+\NormalTok{          )}
+
+\NormalTok{          kmeans\_boot\_sil[b] }\OtherTok{\textless{}{-}} \FunctionTok{compute\_avg\_silhouette}\NormalTok{(x\_boot, km\_labels\_boot)}
+\NormalTok{          kmeans\_boot\_ch[b]  }\OtherTok{\textless{}{-}} \FunctionTok{compute\_ch}\NormalTok{(x\_boot, km\_labels\_boot)}
+\NormalTok{        \}}
+\NormalTok{      \}}
+
+\NormalTok{      boot\_summary }\OtherTok{\textless{}{-}} \FunctionTok{list}\NormalTok{(}
+        \AttributeTok{embedding                     =}\NormalTok{ embedding\_tag,}
+        \AttributeTok{k                             =}\NormalTok{ k\_val,}
+        \AttributeTok{kmeans\_algorithm              =}\NormalTok{ kmeans\_algorithm,}
+        \AttributeTok{kmeans\_nstart                 =}\NormalTok{ kmeans\_nstart,}
+        \AttributeTok{n\_boot                        =}\NormalTok{ n\_boot,}
+        \AttributeTok{bootstrap\_replace             =}\NormalTok{ bootstrap\_replace,}
+        \AttributeTok{sample\_fraction               =}\NormalTok{ sample\_fraction,}
+        \AttributeTok{kmeans\_reference\_silhouette   =}\NormalTok{ ref\_avg\_sil,}
+        \AttributeTok{kmeans\_reference\_ch           =}\NormalTok{ ref\_ch,}
+        \AttributeTok{kmeans\_boot\_ari               =}\NormalTok{ kmeans\_boot\_ari,}
+        \AttributeTok{kmeans\_boot\_sil               =}\NormalTok{ kmeans\_boot\_sil,}
+        \AttributeTok{kmeans\_boot\_ch                =}\NormalTok{ kmeans\_boot\_ch,}
+        \AttributeTok{kmeans\_status                 =}\NormalTok{ kmeans\_status}
+\NormalTok{      )}
+
+      \FunctionTok{saveRDS}\NormalTok{(boot\_summary, boot\_cache\_file)}
+\NormalTok{    \}}
+
+    \CommentTok{\# Summarise this (embedding, k) into one row for the final table}
+\NormalTok{    bootstrap\_results[[}\FunctionTok{length}\NormalTok{(bootstrap\_results) }\SpecialCharTok{+} \DecValTok{1}\NormalTok{]] }\OtherTok{\textless{}{-}} \FunctionTok{data.frame}\NormalTok{(}
+      \AttributeTok{embedding                       =}\NormalTok{ boot\_summary}\SpecialCharTok{$}\NormalTok{embedding,}
+      \AttributeTok{k                               =}\NormalTok{ boot\_summary}\SpecialCharTok{$}\NormalTok{k,}
+      \AttributeTok{kmeans\_algorithm                =}\NormalTok{ boot\_summary}\SpecialCharTok{$}\NormalTok{kmeans\_algorithm,}
+      \AttributeTok{n\_boot                          =}\NormalTok{ boot\_summary}\SpecialCharTok{$}\NormalTok{n\_boot,}
+      \AttributeTok{sample\_fraction                 =}\NormalTok{ boot\_summary}\SpecialCharTok{$}\NormalTok{sample\_fraction,}
+      \AttributeTok{kmeans\_reference\_silhouette     =}\NormalTok{ boot\_summary}\SpecialCharTok{$}\NormalTok{kmeans\_reference\_silhouette,}
+      \AttributeTok{kmeans\_reference\_ch             =}\NormalTok{ boot\_summary}\SpecialCharTok{$}\NormalTok{kmeans\_reference\_ch,}
+      \AttributeTok{kmeans\_bootstrap\_ari\_mean       =} \FunctionTok{mean}\NormalTok{(boot\_summary}\SpecialCharTok{$}\NormalTok{kmeans\_boot\_ari,   }\AttributeTok{na.rm =} \ConstantTok{TRUE}\NormalTok{),}
+      \AttributeTok{kmeans\_bootstrap\_ari\_sd         =} \FunctionTok{sd}\NormalTok{(boot\_summary}\SpecialCharTok{$}\NormalTok{kmeans\_boot\_ari,     }\AttributeTok{na.rm =} \ConstantTok{TRUE}\NormalTok{),}
+      \AttributeTok{kmeans\_bootstrap\_ari\_median     =} \FunctionTok{median}\NormalTok{(boot\_summary}\SpecialCharTok{$}\NormalTok{kmeans\_boot\_ari, }\AttributeTok{na.rm =} \ConstantTok{TRUE}\NormalTok{),}
+      \AttributeTok{kmeans\_bootstrap\_sil\_mean       =} \FunctionTok{mean}\NormalTok{(boot\_summary}\SpecialCharTok{$}\NormalTok{kmeans\_boot\_sil,   }\AttributeTok{na.rm =} \ConstantTok{TRUE}\NormalTok{),}
+      \AttributeTok{kmeans\_bootstrap\_ch\_mean        =} \FunctionTok{mean}\NormalTok{(boot\_summary}\SpecialCharTok{$}\NormalTok{kmeans\_boot\_ch,    }\AttributeTok{na.rm =} \ConstantTok{TRUE}\NormalTok{),}
+      \AttributeTok{kmeans\_valid\_boot               =} \FunctionTok{sum}\NormalTok{(}\FunctionTok{is.finite}\NormalTok{(boot\_summary}\SpecialCharTok{$}\NormalTok{kmeans\_boot\_ari)),}
+      \AttributeTok{stringsAsFactors                =} \ConstantTok{FALSE}
+\NormalTok{    )}
+\NormalTok{  \}}
+\NormalTok{\}}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+## 
+## Processing: user_embeddings_64 
+##   Bootstrapping K-Means for k = 2 
+##     Loading cached bootstrap results for user_embeddings_64 k = 2 
+##   Bootstrapping K-Means for k = 3 
+##     Loading cached bootstrap results for user_embeddings_64 k = 3 
+##   Bootstrapping K-Means for k = 4 
+##     Loading cached bootstrap results for user_embeddings_64 k = 4 
+## 
+## Processing: user_embeddings_128 
+##   Bootstrapping K-Means for k = 2 
+##     Loading cached bootstrap results for user_embeddings_128 k = 2 
+##   Bootstrapping K-Means for k = 3 
+##     Loading cached bootstrap results for user_embeddings_128 k = 3 
+##   Bootstrapping K-Means for k = 4 
+##     Loading cached bootstrap results for user_embeddings_128 k = 4 
+## 
+## Processing: user_embeddings_256 
+##   Bootstrapping K-Means for k = 2 
+##     Loading cached bootstrap results for user_embeddings_256 k = 2 
+##   Bootstrapping K-Means for k = 3 
+##     Loading cached bootstrap results for user_embeddings_256 k = 3 
+##   Bootstrapping K-Means for k = 4 
+##     Loading cached bootstrap results for user_embeddings_256 k = 4
+\end{verbatim}
+
+\section{5. Final table}\label{final-table}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\CommentTok{\# {-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}}
+\CommentTok{\# FINAL TABLE}
+\CommentTok{\# {-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}{-}}
+\NormalTok{bootstrap\_results\_df }\OtherTok{\textless{}{-}} \FunctionTok{bind\_rows}\NormalTok{(bootstrap\_results) }\SpecialCharTok{\%\textgreater{}\%}
+  \FunctionTok{arrange}\NormalTok{(embedding, k)}
+
+\FunctionTok{print}\NormalTok{(bootstrap\_results\_df)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+##             embedding k kmeans_algorithm n_boot sample_fraction
+## 1 user_embeddings_128 2         MacQueen     15             0.3
+## 2 user_embeddings_128 3         MacQueen     15             0.3
+## 3 user_embeddings_128 4         MacQueen     15             0.3
+## 4 user_embeddings_256 2         MacQueen     15             0.3
+## 5 user_embeddings_256 3         MacQueen     15             0.3
+## 6 user_embeddings_256 4         MacQueen     15             0.3
+## 7  user_embeddings_64 2         MacQueen     15             0.3
+## 8  user_embeddings_64 3         MacQueen     15             0.3
+## 9  user_embeddings_64 4         MacQueen     15             0.3
+##   kmeans_reference_silhouette kmeans_reference_ch kmeans_bootstrap_ari_mean
+## 1                 0.332956575           139.50866                 0.8124387
+## 2                 0.209197951           113.00413                 0.6717858
+## 3                -0.010793962            91.25890                 0.2272079
+## 4                 0.288599254           111.23987                 0.7660466
+## 5                 0.175065788            91.72294                 0.5845324
+## 6                 0.004069279            74.78147                 0.3121709
+## 7                 0.240784230           132.29075                 0.5106106
+## 8                 0.151455373           111.44329                 0.5375113
+## 9                -0.010772858            96.96675                 0.2148902
+##   kmeans_bootstrap_ari_sd kmeans_bootstrap_ari_median kmeans_bootstrap_sil_mean
+## 1              0.10168229                   0.8195317                 0.3352736
+## 2              0.15231853                   0.6891476                 0.2202206
+## 3              0.04725906                   0.2382451                 0.1765707
+## 4              0.15026665                   0.8424743                 0.3183727
+## 5              0.18420217                   0.5991052                 0.2308413
+## 6              0.11437866                   0.2861589                 0.1945178
+## 7              0.32637994                   0.6418692                 0.2258669
+## 8              0.11842399                   0.5861616                 0.1650098
+## 9              0.06025239                   0.2215230                 0.1052239
+##   kmeans_bootstrap_ch_mean kmeans_valid_boot
+## 1                 44.84251                15
+## 2                 36.83686                15
+## 3                 31.30925                15
+## 4                 36.16265                15
+## 5                 29.33660                15
+## 6                 23.87587                15
+## 7                 41.12810                15
+## 8                 36.43222                15
+## 9                 31.51353                15
+\end{verbatim}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\FunctionTok{write.csv}\NormalTok{(}
+\NormalTok{  bootstrap\_results\_df,}
+  \AttributeTok{file      =} \FunctionTok{file.path}\NormalTok{(}
+    \StringTok{"output/bootstrap\_stability\_results"}\NormalTok{,}
+    \StringTok{"bootstrap\_stability\_kmeans\_summary.csv"}
+\NormalTok{  ),}
+  \AttributeTok{row.names =} \ConstantTok{FALSE}
+\NormalTok{)}
+\end{Highlighting}
+\end{Shaded}
+
+\section{6. Plot bootstrap stability}\label{plot-bootstrap-stability}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\CommentTok{\# Line plot of mean bootstrap ARI by k, faceted by embedding.}
+\CommentTok{\# Higher ARI = partitions on subsamples closely match the full{-}data partition.}
+\FunctionTok{ggplot}\NormalTok{(bootstrap\_results\_df, }\FunctionTok{aes}\NormalTok{(}\AttributeTok{x =}\NormalTok{ k, }\AttributeTok{y =}\NormalTok{ kmeans\_bootstrap\_ari\_mean)) }\SpecialCharTok{+}
+  \FunctionTok{geom\_line}\NormalTok{(}\AttributeTok{linewidth =} \DecValTok{1}\NormalTok{, }\AttributeTok{color =} \StringTok{"steelblue"}\NormalTok{) }\SpecialCharTok{+}
+  \FunctionTok{geom\_point}\NormalTok{(}\AttributeTok{size =} \DecValTok{2}\NormalTok{,    }\AttributeTok{color =} \StringTok{"steelblue"}\NormalTok{) }\SpecialCharTok{+}
+  \FunctionTok{geom\_errorbar}\NormalTok{(}
+    \FunctionTok{aes}\NormalTok{(}
+      \AttributeTok{ymin =}\NormalTok{ kmeans\_bootstrap\_ari\_mean }\SpecialCharTok{{-}}\NormalTok{ kmeans\_bootstrap\_ari\_sd,}
+      \AttributeTok{ymax =}\NormalTok{ kmeans\_bootstrap\_ari\_mean }\SpecialCharTok{+}\NormalTok{ kmeans\_bootstrap\_ari\_sd}
+\NormalTok{    ),}
+    \AttributeTok{width =} \FloatTok{0.15}\NormalTok{, }\AttributeTok{color =} \StringTok{"steelblue"}\NormalTok{, }\AttributeTok{alpha =} \FloatTok{0.6}
+\NormalTok{  ) }\SpecialCharTok{+}
+  \FunctionTok{facet\_wrap}\NormalTok{(}\SpecialCharTok{\textasciitilde{}}\NormalTok{ embedding, }\AttributeTok{scales =} \StringTok{"free\_y"}\NormalTok{) }\SpecialCharTok{+}
+  \FunctionTok{theme\_minimal}\NormalTok{() }\SpecialCharTok{+}
+  \FunctionTok{labs}\NormalTok{(}
+    \AttributeTok{title =} \StringTok{"K{-}Means Bootstrap Stability by Embedding and k"}\NormalTok{,}
+    \AttributeTok{x     =} \StringTok{"Number of clusters (k)"}\NormalTok{,}
+    \AttributeTok{y     =} \StringTok{"Mean bootstrap ARI (± 1 SD)"}
+\NormalTok{  )}
+\end{Highlighting}
+\end{Shaded}
+
+\pandocbounded{\includegraphics[keepaspectratio]{kmeans-bootstrap-stability_files/figure-latex/plot-bootstrap-stability-1.pdf}}
+
+\section{7. Inspect one cached bootstrap
+result}\label{inspect-one-cached-bootstrap-result}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\CommentTok{\# Change these two values to inspect a different (embedding, k) pair}
+\NormalTok{embedding\_tag }\OtherTok{\textless{}{-}} \StringTok{"user\_embeddings\_128"}
+\NormalTok{k\_val         }\OtherTok{\textless{}{-}} \DecValTok{3}
+
+\NormalTok{cache\_file }\OtherTok{\textless{}{-}} \FunctionTok{file.path}\NormalTok{(}
+  \StringTok{"output/bootstrap\_stability\_cache"}\NormalTok{,}
+  \FunctionTok{paste0}\NormalTok{(}\StringTok{"bootstrap\_kmeans\_"}\NormalTok{, embedding\_tag, }\StringTok{"\_k"}\NormalTok{, k\_val, }\StringTok{".rds"}\NormalTok{)}
+\NormalTok{)}
+
+\ControlFlowTok{if}\NormalTok{ (}\FunctionTok{file.exists}\NormalTok{(cache\_file)) \{}
+\NormalTok{  boot\_obj }\OtherTok{\textless{}{-}} \FunctionTok{readRDS}\NormalTok{(cache\_file)}
+
+\NormalTok{  inspect\_df }\OtherTok{\textless{}{-}} \FunctionTok{data.frame}\NormalTok{(}
+    \AttributeTok{replicate      =} \FunctionTok{seq\_len}\NormalTok{(boot\_obj}\SpecialCharTok{$}\NormalTok{n\_boot),}
+    \AttributeTok{kmeans\_ari     =}\NormalTok{ boot\_obj}\SpecialCharTok{$}\NormalTok{kmeans\_boot\_ari,}
+    \AttributeTok{kmeans\_sil     =}\NormalTok{ boot\_obj}\SpecialCharTok{$}\NormalTok{kmeans\_boot\_sil,}
+    \AttributeTok{kmeans\_ch      =}\NormalTok{ boot\_obj}\SpecialCharTok{$}\NormalTok{kmeans\_boot\_ch,}
+    \AttributeTok{kmeans\_status  =}\NormalTok{ boot\_obj}\SpecialCharTok{$}\NormalTok{kmeans\_status}
+\NormalTok{  )}
+
+  \FunctionTok{print}\NormalTok{(inspect\_df)}
+\NormalTok{\} }\ControlFlowTok{else}\NormalTok{ \{}
+  \FunctionTok{cat}\NormalTok{(}\StringTok{"No bootstrap cache found for"}\NormalTok{, embedding\_tag, }\StringTok{"k ="}\NormalTok{, k\_val, }\StringTok{"}\SpecialCharTok{\textbackslash{}n}\StringTok{"}\NormalTok{)}
+\NormalTok{\}}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+##    replicate kmeans_ari kmeans_sil kmeans_ch kmeans_status
+## 1          1  0.8571959  0.2485707  40.35461            ok
+## 2          2  0.5545028  0.1162968  39.37684            ok
+## 3          3  0.6704615  0.3049019  37.43150            ok
+## 4          4  0.6777022  0.2458837  34.63245            ok
+## 5          5  0.2583505  0.2339513  34.26616            ok
+## 6          6  0.7066454  0.1566305  35.14719            ok
+## 7          7  0.7621258  0.1992524  40.92054            ok
+## 8          8  0.8161686  0.2102347  36.72058            ok
+## 9          9  0.6901125  0.2481212  36.26299            ok
+## 10        10  0.6626063  0.1829932  40.24214            ok
+## 11        11  0.4867739  0.2815467  37.81929            ok
+## 12        12  0.8648610  0.2244730  34.91911            ok
+## 13        13  0.6891476  0.2887060  35.49806            ok
+## 14        14  0.7260884  0.1924021  35.86487            ok
+## 15        15  0.6540452  0.1693451  33.09656            ok
+\end{verbatim}
+
+\end{document}
