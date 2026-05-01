@@ -1,0 +1,673 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.6.42">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="author" content="Ali Jabir">
+<meta name="author" content="Isis Martínez">
+<meta name="author" content="Susan Peck">
+<meta name="dcterms.date" content="2026-05-02">
+
+<title>Reel Intelligence: MovieLens Clustering</title>
+<style>
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+</style>
+
+
+<script src="math252_project_JabirMartinezPeck_files/libs/clipboard/clipboard.min.js"></script>
+<script src="math252_project_JabirMartinezPeck_files/libs/quarto-html/quarto.js"></script>
+<script src="math252_project_JabirMartinezPeck_files/libs/quarto-html/popper.min.js"></script>
+<script src="math252_project_JabirMartinezPeck_files/libs/quarto-html/tippy.umd.min.js"></script>
+<script src="math252_project_JabirMartinezPeck_files/libs/quarto-html/anchor.min.js"></script>
+<link href="math252_project_JabirMartinezPeck_files/libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="math252_project_JabirMartinezPeck_files/libs/quarto-html/quarto-syntax-highlighting-2f5df379a58b258e96c21c0638c20c03.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="math252_project_JabirMartinezPeck_files/libs/bootstrap/bootstrap.min.js"></script>
+<link href="math252_project_JabirMartinezPeck_files/libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="math252_project_JabirMartinezPeck_files/libs/bootstrap/bootstrap-8ffaf084027a881f3b7580f5d96998cb.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+</head><body class="fullcontent">\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{array}
+\usepackage{float}
+\usepackage{setspace}
+\usepackage{graphicx}
+\usepackage{caption}
+\usepackage{hyperref}
+
+  <script src="https://cdnjs.cloudflare.com/polyfill/v3/polyfill.min.js?features=es6"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml-full.js" type="text/javascript"></script>
+
+<script type="text/javascript">
+const typesetMath = (el) => {
+  if (window.MathJax) {
+    // MathJax Typeset
+    window.MathJax.typeset([el]);
+  } else if (window.katex) {
+    // KaTeX Render
+    var mathElements = el.getElementsByClassName("math");
+    var macros = [];
+    for (var i = 0; i < mathElements.length; i++) {
+      var texText = mathElements[i].firstChild;
+      if (mathElements[i].tagName == "SPAN") {
+        window.katex.render(texText.data, mathElements[i], {
+          displayMode: mathElements[i].classList.contains('display'),
+          throwOnError: false,
+          macros: macros,
+          fleqn: false
+        });
+      }
+    }
+  }
+}
+window.Quarto = {
+  typesetMath
+};
+</script>
+
+
+
+
+
+<div id="quarto-content" class="page-columns page-rows-contents page-layout-article">
+
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">Reel Intelligence: MovieLens Clustering</h1>
+<p class="subtitle lead">Final Project Report, Spring 2026</p>
+</div>
+
+
+
+<div class="quarto-title-meta">
+
+    <div>
+    <div class="quarto-title-meta-heading">Authors</div>
+    <div class="quarto-title-meta-contents">
+             <p>Ali Jabir </p>
+             <p>Isis Martínez </p>
+             <p>Susan Peck </p>
+          </div>
+  </div>
+    
+    <div>
+    <div class="quarto-title-meta-heading">Published</div>
+    <div class="quarto-title-meta-contents">
+      <p class="date">May 2, 2026</p>
+    </div>
+  </div>
+  
+    
+  </div>
+  
+
+
+</header>
+
+
+<section id="abstract" class="level1">
+<h1>Abstract</h1>
+<p>TBD</p>
+<p>[NOTE: ADD ANY OTHER INFORMATION NEEDED WITH CODE AND RESULTS LATER]</p>
+<p>[ADD 3 DIFFERENT DATASETS]</p>
+</section>
+<section id="introduction" class="level1">
+<h1>Introduction</h1>
+<p>Clustering is a core unsupervised learning technique used to identify structure in high-dimensional data without labeled outcomes. In movie-rating data, clustering offers a different perspective from prediction-based recommender systems by focusing on groups of users with similar behavior rather than forecasting future ratings.</p>
+<p>Although this study is motivated by data commonly used in recommender systems, it does not evaluate recommendation accuracy or predictive performance. Instead, it assesses clustering quality in learned embedding spaces. Coherent cluster structure in these embeddings may still have downstream relevance for personalization, recommendation, and content organization.</p>
+<p>The MovieLens datasets are widely used benchmarks in machine learning and recommender-systems research because they contain rich user-movie rating information. In this project, we use the MovieLens 1M dataset and cluster user embeddings learned from the rating data. We consider embedding dimensions of 64, 128, and 256 and compare four clustering methods: k-means, probabilistic distance (PD) clustering, reduced k-means, and factorial probabilistic distance clustering (FPDC). The goal is to evaluate how embedding dimension and clustering method jointly affect the quality, stability, and interpretability of clustering solutions.</p>
+<p>This report is organized as follows. <a href="#background">Section II</a> reviews the clustering methods used in the study. <a href="#dataset">Section III</a> describes the dataset and preprocessing pipeline. <a href="#methods-and-experimental-setup">Section IV</a> presents the embedding model and clustering implementation. <a href="#evaluation-framework">Section V</a> defines the evaluation framework. <a href="#results">Section VI</a> reports the experimental results. <a href="#conclusion-and-future-work">Section VII</a> concludes and discusses future work.</p>
+</section>
+<section id="background" class="level1">
+<h1>Background</h1>
+<p>Clustering partitions observations into groups according to a notion of similarity or distance. In this study, clustering is performed in learned embedding spaces, so the geometry of the representation plays a central role in determining cluster quality.</p>
+<p>We consider four partition-based methods that differ along two key dimensions: (i) <strong>hard vs.&nbsp;probabilistic assignment</strong>, and (ii) <strong>clustering in the full space vs.&nbsp;a learned lower-dimensional subspace</strong>.</p>
+<p><strong>k-means</strong> provides a natural baseline. It assigns each observation to a single cluster by minimizing within-cluster variation, and is computationally efficient and widely used. However, it implicitly favors roughly spherical, equally sized clusters and can be sensitive to initialization, scaling, and outliers.</p>
+<p><strong>Probabilistic distance (PD) clustering</strong> replaces hard assignments with probabilistic memberships determined by distances to cluster centers. This produces a soft partition in which observations can belong to multiple clusters to varying degrees. As a result, PD clustering is typically more robust to overlap and noise, but at increased computational cost relative to k-means.</p>
+<p>High-dimensional settings motivate methods that jointly perform clustering and dimension reduction. In such cases, cluster structure may be more clearly expressed in a lower-dimensional subspace than in the original feature space.</p>
+<p><strong>Reduced k-means</strong> extends k-means by simultaneously estimating a low-dimensional projection and a partition within that subspace. By concentrating on directions that are most relevant for clustering, it can recover structure that is obscured in the full space, while retaining the simplicity of hard assignments.</p>
+<p><strong>Factorial probabilistic distance clustering (FPDC)</strong> combines the ideas of PD clustering and dimension reduction. It estimates a latent subspace together with probabilistic cluster memberships, effectively performing soft clustering in a learned representation. This allows FPDC to accommodate overlapping clusters while also mitigating the effects of high dimensionality.</p>
+<p>From this perspective, the four methods can be viewed along two orthogonal axes: assignment (hard vs.&nbsp;probabilistic) and representation (original space vs.&nbsp;learned subspace). These differences suggest potential trade-offs in robustness, interpretability, and computational cost.</p>
+<p>In addition to clustering quality, computational efficiency is an important consideration in high-dimensional settings. Methods that reduce dimension can lower per-iteration cost and memory usage, but may introduce additional overhead from estimating the subspace. For this reason, this study evaluates both clustering performance and computational scalability.</p>
+<p>Because clustering is unsupervised, validation relies on internal criteria, stability, and interpretability rather than labeled outcomes. In particular, the methods considered here may differ in their sensitivity to sampling variability. Probabilistic approaches can accommodate ambiguity in cluster boundaries, while subspace-based methods depend on how well the learned representation captures the underlying structure.</p>
+<p>To assess these differences, this study evaluates clustering <strong>stability under bootstrap resampling</strong>, using agreement between partitions as a primary criterion. Stability provides a complementary perspective to internal fit measures, especially in settings where cluster structure may be weak or sensitive to representation. Accordingly, the evaluation considers multiple complementary metrics rather than relying on a single measure.</p>
+</section>
+<section id="dataset" class="level1">
+<h1>Dataset</h1>
+<p>We use the MovieLens 1M dataset as the primary dataset for this project. MovieLens 1M is a standard benchmark in recommender-systems research and contains approximately one million movie ratings from roughly six thousand users on roughly four thousand movies. Its size makes it suitable for experimenting with learned embeddings and multiple clustering procedures while remaining computationally manageable.</p>
+<p>In addition to MovieLens 1M, we use sampled subsets of the MovieLens 20M dataset for benchmarking. These subsets are used to assess whether clustering results remain stable across different samples drawn from a larger ratings dataset. This complements the main MovieLens 1M analysis by testing the methods on additional user–movie interaction data.</p>
+<p>The main files used in this analysis are the ratings data and movie metadata. The ratings data include user identifiers, movie identifiers, numeric ratings, and timestamps. The movie metadata include titles and genre labels, which are used later to interpret the resulting clusters.</p>
+<p>The preprocessing stage transforms the raw ratings data into a form suitable for representation learning and clustering. Because user–item data are sparse, users with very few ratings and movies with very low interaction frequency may be filtered out. This reduces noise and helps ensure that the learned embeddings reflect sufficient interaction history. Depending on the final embedding pipeline, ratings may be retained in their original form, normalized, or converted into implicit-feedback signals. The processed data are then used to train the embedding model and construct user representations for clustering.</p>
+<p>[WHAT TO ADD: EXACT THRESHOLDS AND FINAL SAMPLE DETAILS SHOULD BE INSERTED ONCE THE IMPLEMENTATION IS COMPLETE.]</p>
+<p>[REPORT THE FILTERING CRITERIA APPLIED TO USERS AND MOVIES.]</p>
+<p>[NUMBER OF OBSERVATIONS RETAINED AFTER PREPROCESSING.]</p>
+<p>[CONSTRUCTION OF THE SAMPLED MOVIELENS 20M BENCHMARK SUBSETS.]</p>
+<p>[ANY NORMALIZATION OR TRANSFORMATION PROCEDURES USED IN CONSTRUCTING THE MODEL INPUT.]</p>
+<p>[INCLUDE A BRIEF SUMMARY OF THE SPARSITY OF THE FINAL USER–ITEM MATRIX AND, IF RELEVANT, DESCRIPTIVE STATISTICS ABOUT RATINGS AND GENRE FREQUENCIES.]</p>
+</section>
+<section id="methods-and-experimental-setup" class="level1">
+<h1>Methods and Experimental Setup</h1>
+<section id="embeddings" class="level2">
+<h2 class="anchored" data-anchor-id="embeddings">Embeddings</h2>
+<p>The methodology consists of two stages. First, dense latent representations are learned from the MovieLens 1M data using an MLP-based embedding model. Second, clustering procedures are applied to those embeddings to determine which combinations of embedding dimension and clustering method yield the strongest grouping structure.</p>
+<p>The representation-learning component produces embeddings of dimensions 64, 128, and 256. These dimensions are compared to evaluate how representation size affects clustering quality. Lower-dimensional embeddings may encourage more compact and stable structure, while higher-dimensional embeddings may capture subtler variation at the cost of greater complexity.</p>
+<p>The exact neural architecture should be documented in the final version of the report. This subsection should specify the input representation, the number and size of hidden layers, activation functions, optimizer, learning rate, batch size, number of training epochs, regularization choices, and the loss function used to train the embeddings. It should also state explicitly that clustering is applied to user embeddings.</p>
+<p>[ADD EXACT NEURAL ARCHITECTURE DETAILS.]</p>
+<p>[ADD LOSS FUNCTION.]</p>
+<p>[ADD OPTIMIZER, LEARNING RATE, BATCH SIZE, EPOCHS, AND REGULARIZATION.]</p>
+<p>After the embeddings are learned, clustering is performed separately in each embedding space. The four clustering methods considered are k-means, PD clustering, reduced k-means, and FPDC. The experimental design applies each method to each embedding dimension in order to compare clustering behavior across both representation size and clustering algorithm.</p>
+<p>The number of clusters considered, the procedure used to select that value, the initialization strategy, stopping criteria, and the number of repeated runs should all be stated explicitly in the final version. These choices affect both clustering quality and computational cost.</p>
+<p>[ADD NUMBER OF CLUSTERS CONSIDERED.]</p>
+<p>[ADD CLUSTER-SELECTION PROCEDURE.]</p>
+<p>[ADD INITIALIZATION STRATEGIES, STOPPING CRITERIA, AND NUMBER OF REPEATED RUNS.]</p>
+<p>Clustering is not performed directly on the raw sparse rating matrix. Instead, the embedding model transforms sparse user–item behavior into a lower-dimensional representation on which clustering is applied.</p>
+</section>
+<section id="clustering-implementation-in-r" class="level2">
+<h2 class="anchored" data-anchor-id="clustering-implementation-in-r">Clustering Implementation in R</h2>
+<p>[NEED CITATIONS]</p>
+<p>All clustering analyses were conducted in R using standardized user-embedding matrices derived from the MovieLens data. Embedding files were imported with the <code>readr</code> package, and the first column containing user identifiers was separated from the embedding coordinates. The remaining embedding features were converted to a numeric matrix and standardized using <code>scale()</code> so that all dimensions contributed comparably to distance-based calculations. Pairwise Euclidean distances were computed using <code>dist()</code> and were used in silhouette-based evaluation. Additional data manipulation and plotting were performed with <code>dplyr</code> and <code>ggplot2</code>, respectively.</p>
+<p>For k-means clustering, the implementation used the base R function <code>kmeans()</code> from the <code>stats</code> package. Candidate numbers of clusters were evaluated over the range</p>
+<p><span class="math display">\[
+k \in \{2,\dots,20\}.
+\]</span></p>
+<p>In the tuning stage, k-means was run with <code>nstart = 10</code> and <code>iter.max = 100</code>, and three algorithmic variants were compared: Hartigan–Wong, Lloyd, and MacQueen. For the final fitted model, k-means was refit with <code>nstart = 100</code> and <code>iter.max = 100</code> using the default Hartigan–Wong algorithm. Model quality was assessed using total within-cluster sum of squares from the fitted object, average silhouette width computed with <code>silhouette()</code> from the <code>cluster</code> package, and the Calinski–Harabasz index computed with <code>intCriteria()</code> from the <code>clusterCrit</code> package. In a separate comparison script, k-means was also run for fixed values</p>
+<p><span class="math display">\[
+k \in \{3,4,5,6,7,8,9,10\}
+\]</span></p>
+<p>using <code>nstart = 100</code>, <code>iter.max = 100</code>, and <code>algorithm = "MacQueen"</code> to compare its partitions with reduced k-means using the adjusted Rand index from the <code>mclust</code> package.</p>
+<p>For reduced k-means, the implementation used the <code>cluspca()</code> function from the <code>clustrd</code> package. Models were fit over the grid</p>
+<p><span class="math display">\[
+k \in \{2,\dots,10\}, \qquad q \in \{2,\dots,6\}.
+\]</span></p>
+<p>Each model was fit as <code>cluspca(embedding_matrix, nclus = k_val, ndim = q_val, method = "RKM", rotation = "varimax")</code>. For each <span class="math inline">\((k,q)\)</span> combination, average silhouette width was computed using <code>silhouette()</code> from the <code>cluster</code> package and the Calinski–Harabasz index was computed with <code>intCriteria()</code> from <code>clusterCrit</code>. The best reduced k-means model for each embedding file was selected using the highest silhouette value, and intermediate results were cached to <code>.rds</code> files.</p>
+<p>Probabilistic distance clustering was implemented in R using the <code>pdclust()</code> function on the standardized embedding matrices. Models were fit over the range</p>
+<p><span class="math display">\[
+k \in \{2,3,4,5\}
+\]</span></p>
+<p>using Euclidean distance. For each value of <span class="math inline">\(k\)</span>, the algorithm produced a matrix of posterior membership probabilities, from which hard cluster assignments were obtained by assigning each observation to the cluster with the highest probability. Cluster centers were estimated internally by the algorithm from these probabilistic assignments. Clustering performance was evaluated using average silhouette width computed with <code>silhouette()</code> from the <code>cluster</code> package, the Calinski–Harabasz index computed using <code>intCriteria()</code> from the <code>clusterCrit</code> package, and a probability-based silhouette measure computed with <code>Silh()</code>. All fitted models and evaluation metrics were saved to <code>.rds</code> files to support reproducibility and avoid recomputation.</p>
+<p>For factorial probabilistic distance clustering (FPDC), the implementation used the <code>FPDC()</code> function from the <code>FPDclustering</code> package. The standardized embedding matrices were evaluated over the grid</p>
+<p><span class="math display">\[
+k \in \{2,\dots,8\}, \qquad q \in \{2,\dots,5\}.
+\]</span></p>
+<p>Each model was fit as <code>FPDC(embedding_matrix, k_val, 20, q_val, nu = 10)</code>, so the implementation used 20 internal iterations and a tuning parameter fixed at</p>
+<p><span class="math display">\[
+\nu = 10.
+\]</span></p>
+<p>For each parameter combination, clustering quality was evaluated using average silhouette width computed from hard labels with <code>silhouette()</code> from the <code>cluster</code> package, the Calinski–Harabasz index from <code>clusterCrit</code>, and the probability-based silhouette returned by <code>Silh()</code> from <code>FPDclustering</code>. The best FPDC solution for each embedding file was selected using silhouette as the primary criterion and Calinski–Harabasz as a secondary criterion. Each fit was cached to <code>.rds</code> files, and summary outputs were written to <code>.csv</code> files.</p>
+</section>
+</section>
+<section id="test-setup-and-evaluation" class="level1">
+<h1>Test Setup and Evaluation</h1>
+<p>Because this project is unsupervised, evaluation is based on internal validation, stability, and interpretability rather than labeled test outcomes. The evaluation framework therefore compares clustering outcomes along several complementary dimensions.</p>
+<p>The first component consists of internal validation metrics. These metrics assess cluster compactness and separation. One key metric is the silhouette score, which measures how similar an observation is to its own cluster relative to the nearest competing cluster. Higher silhouette values indicate stronger separation and better-defined structure. Another criterion is within-cluster sum of squares, which measures variation around assigned centroids. Smaller values indicate tighter clustering, although this quantity generally decreases as the number of clusters increases. Additional indices such as the Davies–Bouldin index may also be used to broaden the comparison of compactness and separation.</p>
+<p>A second component concerns stability. Many clustering algorithms, especially partition-based methods, are sensitive to initialization and local optima. For this reason, clustering configurations should be run multiple times, and the consistency of the resulting partitions should be assessed. Stability can be measured using indices such as adjusted Rand similarity. A method that yields highly variable solutions across repeated runs may be less reliable even if its internal metrics appear strong in a single run.</p>
+<p>A third component is interpretability. Because the MovieLens dataset includes movie genres and potentially user covariates, the resulting user clusters can be examined to determine whether they correspond to meaningful preference patterns or rating behaviors. This interpretive step matters because a mathematically compact clustering is not necessarily substantively useful.</p>
+<p>The final report should state clearly which metrics were used, how many repeated runs were performed, and how the best overall method was selected. If dimensionality-reduction visualizations such as PCA or t-SNE are included, they should be used as qualitative support rather than primary evidence.</p>
+</section>
+<section id="results" class="level1">
+<h1>Results</h1>
+<p>Structure:</p>
+<ol type="1">
+<li>Effect of embedding size: compare 64 vs.&nbsp;128 vs.&nbsp;256.</li>
+<li>Algorithm comparison: k-means vs.&nbsp;PD vs.&nbsp;reduced k-means vs.&nbsp;FPDC.</li>
+<li>Best model selection based on validation metrics.</li>
+</ol>
+<p>[ADD LATER: ALL NUMERIC RESULTS.]</p>
+<p>[ADD LATER: TABLES + PLOTS.]</p>
+<p>[ADD LATER: OBSERVATIONS (E.G., “HIGHER DIMENSION IMPROVES SEPARATION BUT INCREASES VARIANCE”).]</p>
+</section>
+<section id="conclusion-and-future-work" class="level1">
+<h1>Conclusion and Future Work</h1>
+<p>This project studies clustering on learned user embeddings derived from the MovieLens 1M dataset. By comparing embeddings of dimensions 64, 128, and 256 across four clustering methods—k-means, PD clustering, reduced k-means, and FPDC—the analysis evaluates how representation size and clustering method affect unsupervised structure discovery.</p>
+<p>The study brings together partition-based clustering, dimension reduction, latent-factor methods, and cluster validation within a representation-learning framework. Although recommendation performance is not evaluated, the resulting cluster structure may still be relevant to downstream tasks such as personalization, interpretation, and content organization.</p>
+<p>Future work could extend the analysis by incorporating additional clustering methods covered in the course, such as spectral clustering, fuzzy clustering, model-based mixture methods, or clustering with covariates. Another extension would be to include richer user or movie metadata in order to study clustering in augmented feature spaces. It would also be useful to compare MLP-based embeddings with embeddings learned through alternative architectures such as autoencoders or other latent-variable models.</p>
+</section>
+<section id="appendix" class="level1">
+<h1>Appendix</h1>
+<p>You can see our entire code at our GitHub repository.</p>
+<p>[WE SHOULD CITE THE PAPERS WE READ ABOUT THE DIFFERENT CLUSTERING METHODS!]</p>
+</section>
+<section id="references" class="level1">
+<h1>References</h1>
+</section>
+
+</main>
+<!-- /main column -->
+<script id="quarto-html-after-body" type="application/javascript">
+window.document.addEventListener("DOMContentLoaded", function (event) {
+  const toggleBodyColorMode = (bsSheetEl) => {
+    const mode = bsSheetEl.getAttribute("data-mode");
+    const bodyEl = window.document.querySelector("body");
+    if (mode === "dark") {
+      bodyEl.classList.add("quarto-dark");
+      bodyEl.classList.remove("quarto-light");
+    } else {
+      bodyEl.classList.add("quarto-light");
+      bodyEl.classList.remove("quarto-dark");
+    }
+  }
+  const toggleBodyColorPrimary = () => {
+    const bsSheetEl = window.document.querySelector("link#quarto-bootstrap");
+    if (bsSheetEl) {
+      toggleBodyColorMode(bsSheetEl);
+    }
+  }
+  toggleBodyColorPrimary();  
+  const icon = "";
+  const anchorJS = new window.AnchorJS();
+  anchorJS.options = {
+    placement: 'right',
+    icon: icon
+  };
+  anchorJS.add('.anchored');
+  const isCodeAnnotation = (el) => {
+    for (const clz of el.classList) {
+      if (clz.startsWith('code-annotation-')) {                     
+        return true;
+      }
+    }
+    return false;
+  }
+  const onCopySuccess = function(e) {
+    // button target
+    const button = e.trigger;
+    // don't keep focus
+    button.blur();
+    // flash "checked"
+    button.classList.add('code-copy-button-checked');
+    var currentTitle = button.getAttribute("title");
+    button.setAttribute("title", "Copied!");
+    let tooltip;
+    if (window.bootstrap) {
+      button.setAttribute("data-bs-toggle", "tooltip");
+      button.setAttribute("data-bs-placement", "left");
+      button.setAttribute("data-bs-title", "Copied!");
+      tooltip = new bootstrap.Tooltip(button, 
+        { trigger: "manual", 
+          customClass: "code-copy-button-tooltip",
+          offset: [0, -8]});
+      tooltip.show();    
+    }
+    setTimeout(function() {
+      if (tooltip) {
+        tooltip.hide();
+        button.removeAttribute("data-bs-title");
+        button.removeAttribute("data-bs-toggle");
+        button.removeAttribute("data-bs-placement");
+      }
+      button.setAttribute("title", currentTitle);
+      button.classList.remove('code-copy-button-checked');
+    }, 1000);
+    // clear code selection
+    e.clearSelection();
+  }
+  const getTextToCopy = function(trigger) {
+      const codeEl = trigger.previousElementSibling.cloneNode(true);
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+  }
+  const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+    text: getTextToCopy
+  });
+  clipboard.on('success', onCopySuccess);
+  if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+    const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+      text: getTextToCopy,
+      container: window.document.getElementById('quarto-embedded-source-code-modal')
+    });
+    clipboardModal.on('success', onCopySuccess);
+  }
+    var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+    var mailtoRegex = new RegExp(/^mailto:/);
+      var filterRegex = new RegExp('/' + window.location.host + '/');
+    var isInternal = (href) => {
+        return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+    }
+    // Inspect non-navigation links and adorn them if external
+ 	var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+    for (var i=0; i<links.length; i++) {
+      const link = links[i];
+      if (!isInternal(link.href)) {
+        // undo the damage that might have been done by quarto-nav.js in the case of
+        // links that we want to consider external
+        if (link.dataset.originalHref !== undefined) {
+          link.href = link.dataset.originalHref;
+        }
+      }
+    }
+  function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+    const config = {
+      allowHTML: true,
+      maxWidth: 500,
+      delay: 100,
+      arrow: false,
+      appendTo: function(el) {
+          return el.parentElement;
+      },
+      interactive: true,
+      interactiveBorder: 10,
+      theme: 'quarto',
+      placement: 'bottom-start',
+    };
+    if (contentFn) {
+      config.content = contentFn;
+    }
+    if (onTriggerFn) {
+      config.onTrigger = onTriggerFn;
+    }
+    if (onUntriggerFn) {
+      config.onUntrigger = onUntriggerFn;
+    }
+    window.tippy(el, config); 
+  }
+  const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+  for (var i=0; i<noterefs.length; i++) {
+    const ref = noterefs[i];
+    tippyHover(ref, function() {
+      // use id or data attribute instead here
+      let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+      try { href = new URL(href).hash; } catch {}
+      const id = href.replace(/^#\/?/, "");
+      const note = window.document.getElementById(id);
+      if (note) {
+        return note.innerHTML;
+      } else {
+        return "";
+      }
+    });
+  }
+  const xrefs = window.document.querySelectorAll('a.quarto-xref');
+  const processXRef = (id, note) => {
+    // Strip column container classes
+    const stripColumnClz = (el) => {
+      el.classList.remove("page-full", "page-columns");
+      if (el.children) {
+        for (const child of el.children) {
+          stripColumnClz(child);
+        }
+      }
+    }
+    stripColumnClz(note)
+    if (id === null || id.startsWith('sec-')) {
+      // Special case sections, only their first couple elements
+      const container = document.createElement("div");
+      if (note.children && note.children.length > 2) {
+        container.appendChild(note.children[0].cloneNode(true));
+        for (let i = 1; i < note.children.length; i++) {
+          const child = note.children[i];
+          if (child.tagName === "P" && child.innerText === "") {
+            continue;
+          } else {
+            container.appendChild(child.cloneNode(true));
+            break;
+          }
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(container);
+        }
+        return container.innerHTML
+      } else {
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        return note.innerHTML;
+      }
+    } else {
+      // Remove any anchor links if they are present
+      const anchorLink = note.querySelector('a.anchorjs-link');
+      if (anchorLink) {
+        anchorLink.remove();
+      }
+      if (window.Quarto?.typesetMath) {
+        window.Quarto.typesetMath(note);
+      }
+      if (note.classList.contains("callout")) {
+        return note.outerHTML;
+      } else {
+        return note.innerHTML;
+      }
+    }
+  }
+  for (var i=0; i<xrefs.length; i++) {
+    const xref = xrefs[i];
+    tippyHover(xref, undefined, function(instance) {
+      instance.disable();
+      let url = xref.getAttribute('href');
+      let hash = undefined; 
+      if (url.startsWith('#')) {
+        hash = url;
+      } else {
+        try { hash = new URL(url).hash; } catch {}
+      }
+      if (hash) {
+        const id = hash.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note !== null) {
+          try {
+            const html = processXRef(id, note.cloneNode(true));
+            instance.setContent(html);
+          } finally {
+            instance.enable();
+            instance.show();
+          }
+        } else {
+          // See if we can fetch this
+          fetch(url.split('#')[0])
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.getElementById(id);
+            if (note !== null) {
+              const html = processXRef(id, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      } else {
+        // See if we can fetch a full url (with no hash to target)
+        // This is a special case and we should probably do some content thinning / targeting
+        fetch(url)
+        .then(res => res.text())
+        .then(html => {
+          const parser = new DOMParser();
+          const htmlDoc = parser.parseFromString(html, "text/html");
+          const note = htmlDoc.querySelector('main.content');
+          if (note !== null) {
+            // This should only happen for chapter cross references
+            // (since there is no id in the URL)
+            // remove the first header
+            if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+              note.children[0].remove();
+            }
+            const html = processXRef(null, note);
+            instance.setContent(html);
+          } 
+        }).finally(() => {
+          instance.enable();
+          instance.show();
+        });
+      }
+    }, function(instance) {
+    });
+  }
+      let selectedAnnoteEl;
+      const selectorForAnnotation = ( cell, annotation) => {
+        let cellAttr = 'data-code-cell="' + cell + '"';
+        let lineAttr = 'data-code-annotation="' +  annotation + '"';
+        const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+        return selector;
+      }
+      const selectCodeLines = (annoteEl) => {
+        const doc = window.document;
+        const targetCell = annoteEl.getAttribute("data-target-cell");
+        const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+        const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+        const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+        const lineIds = lines.map((line) => {
+          return targetCell + "-" + line;
+        })
+        let top = null;
+        let height = null;
+        let parent = null;
+        if (lineIds.length > 0) {
+            //compute the position of the single el (top and bottom and make a div)
+            const el = window.document.getElementById(lineIds[0]);
+            top = el.offsetTop;
+            height = el.offsetHeight;
+            parent = el.parentElement.parentElement;
+          if (lineIds.length > 1) {
+            const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+            const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+            height = bottom - top;
+          }
+          if (top !== null && height !== null && parent !== null) {
+            // cook up a div (if necessary) and position it 
+            let div = window.document.getElementById("code-annotation-line-highlight");
+            if (div === null) {
+              div = window.document.createElement("div");
+              div.setAttribute("id", "code-annotation-line-highlight");
+              div.style.position = 'absolute';
+              parent.appendChild(div);
+            }
+            div.style.top = top - 2 + "px";
+            div.style.height = height + 4 + "px";
+            div.style.left = 0;
+            let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+            if (gutterDiv === null) {
+              gutterDiv = window.document.createElement("div");
+              gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+              gutterDiv.style.position = 'absolute';
+              const codeCell = window.document.getElementById(targetCell);
+              const gutter = codeCell.querySelector('.code-annotation-gutter');
+              gutter.appendChild(gutterDiv);
+            }
+            gutterDiv.style.top = top - 2 + "px";
+            gutterDiv.style.height = height + 4 + "px";
+          }
+          selectedAnnoteEl = annoteEl;
+        }
+      };
+      const unselectCodeLines = () => {
+        const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+        elementsIds.forEach((elId) => {
+          const div = window.document.getElementById(elId);
+          if (div) {
+            div.remove();
+          }
+        });
+        selectedAnnoteEl = undefined;
+      };
+        // Handle positioning of the toggle
+    window.addEventListener(
+      "resize",
+      throttle(() => {
+        elRect = undefined;
+        if (selectedAnnoteEl) {
+          selectCodeLines(selectedAnnoteEl);
+        }
+      }, 10)
+    );
+    function throttle(fn, ms) {
+    let throttle = false;
+    let timer;
+      return (...args) => {
+        if(!throttle) { // first call gets through
+            fn.apply(this, args);
+            throttle = true;
+        } else { // all the others get throttled
+            if(timer) clearTimeout(timer); // cancel #2
+            timer = setTimeout(() => {
+              fn.apply(this, args);
+              timer = throttle = false;
+            }, ms);
+        }
+      };
+    }
+      // Attach click handler to the DT
+      const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+      for (const annoteDlNode of annoteDls) {
+        annoteDlNode.addEventListener('click', (event) => {
+          const clickedEl = event.target;
+          if (clickedEl !== selectedAnnoteEl) {
+            unselectCodeLines();
+            const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+            if (activeEl) {
+              activeEl.classList.remove('code-annotation-active');
+            }
+            selectCodeLines(clickedEl);
+            clickedEl.classList.add('code-annotation-active');
+          } else {
+            // Unselect the line
+            unselectCodeLines();
+            clickedEl.classList.remove('code-annotation-active');
+          }
+        });
+      }
+  const findCites = (el) => {
+    const parentEl = el.parentElement;
+    if (parentEl) {
+      const cites = parentEl.dataset.cites;
+      if (cites) {
+        return {
+          el,
+          cites: cites.split(' ')
+        };
+      } else {
+        return findCites(el.parentElement)
+      }
+    } else {
+      return undefined;
+    }
+  };
+  var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+  for (var i=0; i<bibliorefs.length; i++) {
+    const ref = bibliorefs[i];
+    const citeInfo = findCites(ref);
+    if (citeInfo) {
+      tippyHover(citeInfo.el, function() {
+        var popup = window.document.createElement('div');
+        citeInfo.cites.forEach(function(cite) {
+          var citeDiv = window.document.createElement('div');
+          citeDiv.classList.add('hanging-indent');
+          citeDiv.classList.add('csl-entry');
+          var biblioDiv = window.document.getElementById('ref-' + cite);
+          if (biblioDiv) {
+            citeDiv.innerHTML = biblioDiv.innerHTML;
+          }
+          popup.appendChild(citeDiv);
+        });
+        return popup.innerHTML;
+      });
+    }
+  }
+});
+</script>
+</div> <!-- /content -->
+
+
+
+
+</body></html>
