@@ -2,7 +2,7 @@
 
 We use the MovieLens 1M dataset as the primary dataset for this project. MovieLens 1M is a standard benchmark in recommender-systems research and contains approximately one million movie ratings from roughly six thousand users on roughly four thousand movies. Its size makes it suitable for experimenting with learned embeddings and multiple clustering procedures while remaining computationally manageable.
 
-In addition to MovieLens 1M, we use sampled subsets of the MovieLens 20M dataset for benchmarking. These subsets are used to assess whether clustering results remain stable across different samples drawn from a larger ratings dataset. This complements the main MovieLens 1M analysis by testing the methods on additional user--movie interaction data.
+To evaluate the robustness of our approach, we constructed additional benchmark datasets using the larger MovieLens 20M dataset. Specifically, we generated two supplementary samples by randomly selecting a subset of users comparable in size to the MovieLens 1M dataset (i.e. 6040 users). For each sampled user set, we retained all associated ratings to preserve the natural interaction structure between users and movies. This approach allows for a fair comparison across datasets of similar scale while introducing variability in user behavior, enabling us to assess the stability and generalizability of our embedding and clustering pipeline.
 
 The main files used in this analysis are the ratings data and movie metadata. The ratings data include user identifiers, movie identifiers, numeric ratings, and timestamps. The movie metadata include titles and genre labels, which are used later to interpret the resulting clusters.
 
@@ -14,7 +14,6 @@ The preprocessing stage transforms the raw ratings data into a form suitable for
 
 [NUMBER OF OBSERVATIONS RETAINED AFTER PREPROCESSING.]
 
-[CONSTRUCTION OF THE SAMPLED MOVIELENS 20M BENCHMARK SUBSETS.]
 
 [ANY NORMALIZATION OR TRANSFORMATION PROCEDURES USED IN CONSTRUCTING THE MODEL INPUT.]
 
