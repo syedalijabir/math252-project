@@ -17,7 +17,10 @@ Structure:
 
 # Results
 
-This section compares clustering performance across embedding dimensions and methods using average silhouette width as the primary selection criterion, with the Calinski--Harabasz index and runtime used as secondary criteria. All figures and tables below are generated directly from cached `.rds` outputs so that the report stays reproducible without rerunning the full clustering pipeline during rendering.
+This section compares clustering performance across embedding dimensions and methods
+using average silhouette width as the primary criterion, with the Calinski--Harabasz
+(CH) index, runtime, and bootstrap stability as secondary criteria. All results are
+generated directly from cached `.rds` outputs.
 
 ## Best model by method and embedding dimension
 
@@ -31,13 +34,36 @@ knitr::kable(
 
 Across all method--embedding combinations, the highest silhouette value in the cached results was obtained by `r as.character(overall_best$method)` using the `r overall_best$embedding_dim`-dimensional embeddings with `r overall_best$k` clusters`r if (!is.na(overall_best$q)) paste0(" and q = ", overall_best$q) else ""`. This configuration achieved a silhouette score of `r round(overall_best$silhouette, 3)` and a Calinski--Harabasz value of `r round(overall_best$ch, 2)`.
 
+
+[HARD CODED OPTION FOR PARAGRPAH ABOVE]
+Across all methods, the 128-dimensional embedding consistently produced the strongest
+clustering structure as measured by silhouette width, followed by 256 and then 64
+dimensions (Figure \@ref(fig:best-silhouette-fig), Table \@ref(tab:best-model-table)).
+This pattern suggests that 64 dimensions may be insufficient to capture the full latent
+structure of user preferences, while 256 dimensions may introduce enough noise or
+redundancy to slightly reduce cluster separation. The 128-dimensional embedding appears
+to offer the best balance between representational capacity and signal clarity for this
+dataset.
+
 ## Effect of embedding size
 
 ```{r fig-best-silhouette, fig.cap="Best silhouette score attained by each clustering method within each embedding dimension."}
 plot_best_silhouette_by_method_embedding(plot_df)
 ```
 
-The figure above compares the best silhouette score achieved by each method within each embedding dimension. This view is useful because it separates the representation-size comparison from the larger tuning grid over `k` and, where relevant, `q`.
+Within each embedding dimension, K-means and RKM achieved substantially higher
+silhouette scores than PD and FPDC (Figure \@ref(fig:best-silhouette-fig),
+Table \@ref(tab:best-model-table)). The best overall solution was K-means on the
+128-dimensional embedding with $k = 2$, achieving a silhouette of 0.334 and CH of
+139.51. RKM performed nearly identically to K-means across all settings, with silhouette
+scores differing by no more than 0.003 at any embedding dimension, suggesting that the
+additional dimensionality reduction step in RKM did not meaningfully alter the partition
+structure recovered by K-means alone in this setting. Across all methods and embedding
+dimensions, the best solution by silhouette was consistently found at $k = 2$, with the
+exception of FPDC on the 64-dimensional embedding which selected $k = 3$. The silhouette
+profile for K-means across $k$ (Figure \@ref(fig:sil-k-fig)) shows a sharp decline
+after $k = 2$ in all embedding dimensions, confirming that the data support a broad
+two-group partition most strongly.
 
 ## Algorithm comparison and computational cost
 
