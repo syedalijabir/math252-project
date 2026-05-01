@@ -6,9 +6,9 @@ author:
   - Isis Martínez
   - Susan Peck
 date: "May 2, 2026"
-output:
-  pdf_document:
-    latex_engine: pdflatex
+format:
+  pdf:
+    pdf-engine: pdflatex
 fontsize: 11pt
 geometry: margin=1in
 header-includes:
