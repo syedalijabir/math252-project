@@ -102,7 +102,7 @@ full-data reference partition using ARI. Reduced K-means used reference models s
 over $q \in \{2, \ldots, 6\}$ and FPDC used reference models selected over
 $q \in \{2, \ldots, 4\}$.
 
-Figure \@ref(fig:kmeans-bootstrap-fig) shows the bootstrap stability profile for
+Figure \ref{fig:kmeans_bootstrap} shows the bootstrap stability profile for
 K-means across the three embedding sizes. The 128 and 256 dimensional embeddings show
 the same overall pattern: stability is highest at $k = 2$, remains moderate at $k = 3$,
 and drops sharply at $k = 4$. The 64 dimensional embedding is less stable overall, with
@@ -112,11 +112,14 @@ partitions at lower cluster counts, especially for the higher dimensional embedd
 while four-cluster solutions appear substantially less stable. This is consistent with
 the internal validation results, where silhouette scores also peaked at $k = 2$.
 
-```{r kmeans-bootstrap-fig, echo=FALSE, fig.cap="Bootstrap stability for K-means across embeddings and cluster counts."}
-knitr::include_graphics("../figures/kmeans-stability.png")
-```
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.8\textwidth]{figures/kmeans-stability.png}
+    \caption{Bootstrap stability for K-means across embeddings and cluster counts.}
+    \label{fig:kmeans_bootstrap}
+\end{figure}
 
-Figure \@ref(fig:rkm-bootstrap-fig) shows the bootstrap stability results for Reduced
+Figure \ref{fig:rkm_bootstrap} shows the bootstrap stability results for Reduced
 K-means. The strongest stability appears for $k = 2$ in the 128 and 256 dimensional
 embeddings, where mean ARI is high and clearly exceeds the values seen for the 64
 dimensional embedding. For the 64 dimensional embedding, stability decreases noticeably
@@ -125,25 +128,32 @@ stable at $k = 2$ and compares favorably with standard K-means, reinforcing the
 conclusion from the silhouette analysis that both methods recover the same underlying
 two-group structure.
 
-```{r rkm-bootstrap-fig, echo=FALSE, fig.cap="Bootstrap stability for Reduced K-means across embeddings and cluster counts."}
-knitr::include_graphics("../figures/rkm-stability.png")
-```
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.8\textwidth]{figures/rkm-stability.png}
+    \caption{Bootstrap stability for Reduced K-means across embeddings and cluster counts.}
+    \label{fig:rkm_bootstrap}
+\end{figure}
 
-Figure \@ref(fig:pd-bootstrap-fig) presents the bootstrap stability results for PD
+
+Figure \ref{fig:pd_bootstrap} presents the bootstrap stability results for PD
 clustering. In contrast to K-means and RKM, ARI values are extremely close to zero
 across nearly all settings, with only a small positive value for the 64-dimensional
 embedding at $k = 2$. The 128 and 256 dimensional embeddings show near-zero or slightly
 negative mean ARI throughout, indicating that bootstrap partitions do not reproduce the
 full-data clustering in a consistent way. This result is consistent with the near-zero
-silhouette scores reported in Table \@ref(tab:tbl-best-models), and together they
+silhouette scores reported in Table \ref{tab:tbl-best-models}, and together they
 suggest that PD clustering failed to identify stable or well-separated structure in
 these embeddings.
 
-```{r pd-bootstrap-fig, echo=FALSE, fig.cap="Bootstrap stability for PD clustering across embeddings and cluster counts."}
-knitr::include_graphics("../figures/pd-stability.png")
-```
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.8\textwidth]{figures/pd-stability.png}
+    \caption{Bootstrap stability for PD clustering across embeddings and cluster counts.}
+    \label{fig:pd_bootstrap}
+\end{figure}
 
-Figure \@ref(fig:fpdc-bootstrap-fig) shows the bootstrap stability profile for FPDC.
+Figure \ref{fig:fpdc_bootstrap} shows the bootstrap stability profile for FPDC.
 As with PD clustering, mean ARI values are clustered very close to zero across all
 embeddings and values of $k$, although estimates are slightly positive in most cases.
 The 128 and 64 dimensional embeddings show a small local increase at $k = 3$, while the
@@ -154,6 +164,9 @@ some settings. Combined with its poor silhouette scores and substantially higher
 runtimes, FPDC was the least competitive method across all three evaluation dimensions
 considered in this study.
 
-```{r fpdc-bootstrap-fig, echo=FALSE, fig.cap="Bootstrap stability for FPDC across embeddings and cluster counts."}
-knitr::include_graphics("../figures/fpdc-stability.png")
-```
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.8\textwidth]{figures/fpdc-stability.png}
+    \caption{Bootstrap stability for FPDC across embeddings and cluster counts.}
+    \label{fig:fpdc_bootstrap}
+\end{figure}
