@@ -1,28 +1,9 @@
 # Results
 
-Structure:
-
-1. Effect of embedding size: compare 64 vs. 128 vs. 256.
-2. Algorithm comparison: k-means vs. PD vs. reduced k-means vs. FPDC.
-3. Best model selection based on validation metrics.
-
-[ADD LATER: ALL NUMERIC RESULTS.]
-
-[ADD LATER: TABLES + PLOTS.]
-
-[ADD LATER: OBSERVATIONS (E.G., "HIGHER DIMENSION IMPROVES SEPARATION BUT INCREASES VARIANCE").]
-
-
-# `Report/sections/06-results.Rmd`
-
-# Results
-
 This section compares clustering performance across embedding dimensions and methods
 using average silhouette width as the primary criterion, with the Calinski--Harabasz
 (CH) index, runtime, and bootstrap stability as secondary criteria. All results are
 generated directly from cached `.rds` outputs.
-
-## Best model by method and embedding dimension
 
 ```{r tbl-best-models}
 knitr::kable(
@@ -32,33 +13,33 @@ knitr::kable(
 )
 ```
 
-Across all method--embedding combinations, the highest silhouette value in the cached results was obtained by `r as.character(overall_best$method)` using the `r overall_best$embedding_dim`-dimensional embeddings with `r overall_best$k` clusters`r if (!is.na(overall_best$q)) paste0(" and q = ", overall_best$q) else ""`. This configuration achieved a silhouette score of `r round(overall_best$silhouette, 3)` and a Calinski--Harabasz value of `r round(overall_best$ch, 2)`.
+Across all method--embedding combinations, the highest silhouette value in the cached
+results was obtained by `r as.character(overall_best$method)` using the
+`r overall_best$embedding_dim`-dimensional embeddings with `r overall_best$k`
+clusters`r if (!is.na(overall_best$q)) paste0(" and q = ", overall_best$q) else ""`.
+This configuration achieved a silhouette score of `r round(overall_best$silhouette, 3)`
+and a Calinski--Harabasz value of `r round(overall_best$ch, 2)`.
 
-
-## Effect of embedding size
-
-```{r fig-best-silhouette, fig.cap="Best silhouette score attained by each clustering method within each embedding dimension."}
+```{r best-silhouette-fig, fig.cap="Best silhouette score attained by each clustering method within each embedding dimension."}
 plot_best_silhouette_by_method_embedding(plot_df)
 ```
 
 Across all methods, the 128-dimensional embedding consistently produced the strongest
 clustering structure as measured by silhouette width, followed by 256 and then 64
-dimensions (Figure \@ref(fig:best-silhouette-fig), Table \@ref(tab:best-model-table)).
+dimensions (Figure \@ref(fig:best-silhouette-fig), Table \@ref(tab:tbl-best-models)).
 This pattern suggests that 64 dimensions may be insufficient to capture the full latent
 structure of user preferences, while 256 dimensions may introduce enough noise or
 redundancy to slightly reduce cluster separation. The 128-dimensional embedding appears
 to offer the best balance between representational capacity and signal clarity for this
 dataset.
 
-## Algorithm comparison
-
-```{r fig-runtime-tradeoff, fig.cap="Runtime-performance tradeoff across all cached clustering models. Lower runtime and higher silhouette are preferred."}
+```{r runtime-perf-fig, fig.cap="Runtime-performance tradeoff across all cached clustering models. Lower runtime and higher silhouette are preferred."}
 plot_runtime_vs_silhouette(plot_df)
 ```
 
 K-means and RKM achieved substantially higher silhouette scores than PD and FPDC across
 all embedding dimensions (Figure \@ref(fig:best-silhouette-fig),
-Table \@ref(tab:best-model-table)). The best overall solution was K-means on the
+Table \@ref(tab:tbl-best-models)). The best overall solution was K-means on the
 128-dimensional embedding with $k = 2$, achieving a silhouette of 0.334 and CH of
 139.51. RKM performed nearly identically to K-means across all settings, with silhouette
 scores differing by no more than 0.003 at any embedding dimension, suggesting that the
@@ -66,7 +47,7 @@ additional dimensionality reduction step in RKM did not meaningfully alter the p
 structure recovered by K-means alone in this setting.
 
 PD clustering performed poorly across all embedding dimensions, with silhouette scores
-near zero regardless of embedding size (Table \@ref(tab:best-model-table)). This is
+near zero regardless of embedding size (Table \@ref(tab:tbl-best-models)). This is
 consistent with the runtime-performance tradeoff plot
 (Figure \@ref(fig:runtime-perf-fig)), which shows PD solutions clustered along the
 bottom of the silhouette axis despite fast runtimes. The near-zero silhouette scores
@@ -76,15 +57,13 @@ suited to the approximately spherical, well-separated clusters that appear to be
 in these embeddings.
 
 FPDC similarly produced low silhouette scores across all settings, with values between
-0.004 and 0.014 (Table \@ref(tab:best-model-table)). In addition to weak clustering
+0.004 and 0.014 (Table \@ref(tab:tbl-best-models)). In addition to weak clustering
 quality, FPDC incurred substantially higher runtimes than the other methods, with the
 128-dimensional solution taking over 8,000 seconds
 (Figure \@ref(fig:runtime-perf-fig)). This poor runtime-performance tradeoff makes
 FPDC the least competitive method in this setting.
 
-## Agreement across methods
-
-```{r fig-ari-method-pairs, fig.cap="Average adjusted Rand index by method pair, computed within matched embedding dimensions and values of k."}
+```{r ari-fig, fig.cap="Average adjusted Rand index by method pair, computed within matched embedding dimensions and values of k."}
 plot_ari_method_pairs(ari_df)
 ```
 
@@ -99,26 +78,20 @@ fundamentally different partitions than K-means and RKM. The within-method ARI f
 FPDC (average 0.271) also indicates moderate variability across FPDC solutions at
 different $(k, q)$ settings, reflecting sensitivity to the tuning grid.
 
-
-## Tuning patterns for the baseline methods
-
-```{r fig-silhouette-vs-k, fig.cap="Silhouette scores across candidate values of k for K-means and PD clustering, stratified by embedding dimension."}
+```{r sil-k-fig, fig.cap="Silhouette scores across candidate values of k for K-means and PD clustering, stratified by embedding dimension."}
 plot_silhouette_vs_k(plot_df, methods = c("KMeans", "PD"))
 ```
 
-[This final plot provides a compact view of how the tuning parameter `k` changes the clustering quality for the two baseline methods across the embedding dimensions. If you need to shorten the section, this is the first figure I would move to the appendix.]
-
-
 Across all methods and embedding dimensions, the best solution by silhouette was
 consistently found at $k = 2$, with the exception of FPDC on the 64-dimensional
-embedding which selected $k = 3$ (Table \@ref(tab:best-model-table)). The silhouette
+embedding which selected $k = 3$ (Table \@ref(tab:tbl-best-models)). The silhouette
 profile for K-means across $k$ (Figure \@ref(fig:sil-k-fig)) shows a sharp decline
 after $k = 2$ in all embedding dimensions, confirming that the data support a broad
 two-group partition most strongly. The flat, near-zero silhouette profile for PD across
 the same range of $k$ further confirms that PD clustering did not find meaningful
 structure at any cluster count.
 
-### Stability Analysis
+## Stability Analysis
 
 Bootstrap stability was assessed using a common design across all four clustering
 methods. The 64, 128, and 256 dimensional user embeddings were each evaluated for
@@ -162,7 +135,7 @@ across nearly all settings, with only a small positive value for the 64-dimensio
 embedding at $k = 2$. The 128 and 256 dimensional embeddings show near-zero or slightly
 negative mean ARI throughout, indicating that bootstrap partitions do not reproduce the
 full-data clustering in a consistent way. This result is consistent with the near-zero
-silhouette scores reported in Table \@ref(tab:best-model-table), and together they
+silhouette scores reported in Table \@ref(tab:tbl-best-models), and together they
 suggest that PD clustering failed to identify stable or well-separated structure in
 these embeddings.
 
@@ -184,5 +157,3 @@ considered in this study.
 ```{r fpdc-bootstrap-fig, echo=FALSE, fig.cap="Bootstrap stability for FPDC across embeddings and cluster counts."}
 knitr::include_graphics("../figures/fpdc-stability.png")
 ```
-T
-
