@@ -1,28 +1,56 @@
 # Test Setup and Evaluation
 
-Because this project is unsupervised, evaluation is based on internal validation, stability, and interpretability rather than labeled test outcomes. The evaluation framework therefore compares clustering outcomes along several complementary dimensions.
+## Evaluation Framework
 
-The first component consists of internal validation metrics. These metrics assess cluster compactness and separation. One key metric is the silhouette score, which measures how similar an observation is to its own cluster relative to the nearest competing cluster. Higher silhouette values indicate stronger separation and better-defined structure. Another criterion is within-cluster sum of squares, which measures variation around assigned centroids. Smaller values indicate tighter clustering, although this quantity generally decreases as the number of clusters increases. Additional indices such as the Davies--Bouldin index may also be used to broaden the comparison of compactness and separation.
+Because no ground truth labels are available, evaluation relies on internal validation
+metrics, bootstrap stability, and interpretability rather than external criteria.
 
-A second component concerns stability. Many clustering algorithms, especially partition-based methods, are sensitive to initialization and local optima. For this reason, clustering configurations should be run multiple times, and the consistency of the resulting partitions should be assessed. Stability can be measured using indices such as adjusted Rand similarity. A method that yields highly variable solutions across repeated runs may be less reliable even if its internal metrics appear strong in a single run.
+### Internal Validation Metrics
 
-A third component is interpretability. Because the MovieLens dataset includes movie genres and potentially user covariates, the resulting user clusters can be examined to determine whether they correspond to meaningful preference patterns or rating behaviors. This interpretive step matters because a mathematically compact clustering is not necessarily substantively useful.
+Three internal criteria are used to assess cluster quality across all methods. The
+**average silhouette width** [@kaufman1990finding] measures how similar each observation
+is to its own cluster relative to the nearest competing cluster, with higher values
+indicating stronger separation and better-defined structure. The
+**Calinski--Harabasz (CH) index** measures the ratio of between-cluster to
+within-cluster scatter, where larger values indicate more compact and well-separated
+clusters. For the probabilistic methods (PD and FPDC), a **probability silhouette** is
+additionally computed using `Silh()` from the `FPDclustering` package
+[@tortora2024fpdclustering], which extends the silhouette concept to soft membership
+weights and is better suited to evaluating solutions where observations belong
+partially to multiple clusters. For k-means only, **total within-cluster sum of squares
+(WSS)** is also reported as it directly reflects the k-means objective and is used in
+the elbow method for cluster count selection.
 
-The final report should state clearly which metrics were used, how many repeated runs were performed, and how the best overall method was selected. If dimensionality-reduction visualizations such as PCA or t-SNE are included, they should be used as qualitative support rather than primary evidence.
+### Stability
 
-## K-means
-We evaluated standard k-means clustering on user embeddings of sizes 64, 128, and 256. Before clustering, each embedding matrix was standardized to ensure that all dimensions contributed comparably to the distance calculations. For each embedding size, we tested cluster counts in the range $k \in \{2, \dots, 20\}$ using three k-means variants: Hartigan-Wong, and MacQueen. The number of clusters was selected primarily using the elbow method based on within-cluster sum of squares (WSS), while the average silhouette score and Calinski--Harabasz (CH) index were used as supporting diagnostics to assess clustering quality.
+Clustering algorithms such as k-means and RKM are sensitive to initialization and local
+optima, so a method that yields highly variable solutions across repeated runs may be
+unreliable even if its internal metrics appear strong in a single run
+[@everitt2011cluster]. Bootstrap stability is therefore assessed for each method by
+resampling 30% of users across 15 replicates and comparing each replicate's partition
+to the full-data reference solution using the adjusted Rand index (ARI)
+[@kaufman1990finding]. ARI ranges from 0 (no agreement beyond chance) to 1 (perfect
+agreement), with higher values indicating more reproducible clustering solutions. For PD
+and FPDC, hard labels are obtained by assigning each user to their highest-probability
+cluster before computing ARI, enabling direct comparison across all four methods on a
+common scale.
 
-## Reduced k-means
+### Implementation Summary
 
-For clustering evaluation, we applied Reduced K-Means (RKM) to user embeddings of sizes 64, 128, and 256. Prior to clustering, all embedding vectors were standardized to have zero mean and unit variance. We performed a grid search over the number of clusters $k \in \{2, \dots, 10\}$ and reduced dimensionality $q \in \{2, \dots, 6\}$, evaluating each configuration using both the average silhouette score and the Calinski--Harabasz (CH) index. To improve computational efficiency, intermediate results for each $(k, q)$ combination were cached and reused across runs. For each embedding size, the best model was selected based on the highest silhouette score, with the CH index used as a secondary criterion.
+All methods were applied to standardized embedding matrices of dimensions 64, 128, and
+256. For each method, the number of clusters $k$ was selected primarily using the
+highest average silhouette width, with the CH index used as a secondary criterion where
+silhouette scores were tied or ambiguous. Where relevant, the reduced dimension $q$ was
+selected jointly with $k$ over a two-dimensional grid. Intermediate results were cached
+to `.rds` files to support reproducibility without rerunning the full pipeline during
+rendering. The tuning ranges and selection criteria for each method are summarized in
+Table X.
 
-## Probabilistic Distance Clustering
-We evaluated PD clustering on user embeddings of sizes 64, 128, and 256. As in the other clustering experiments, each embedding matrix was standardized before analysis so that all dimensions were on a comparable scale. For each embedding size, we tested the number of clusters over the range $k \in \{2, \dots, 10\}$ and evaluated each solution using three criteria: average silhouette score, Calinski--Harabasz (CH) index, and probability silhouette. These complementary metrics were used to assess both geometric cluster separation and the quality of the probabilistic cluster assignments produced by the PD method.
+| Method | $k$ range | $q$ range | Primary criterion | Secondary criterion |
+|--------|-----------|-----------|-------------------|---------------------|
+| K-Means | $2, \ldots, 20$ | --- | Silhouette | CH, WSS |
+| Reduced K-Means | $2, \ldots, 10$ | $2, \ldots, 6$ | Silhouette | CH |
+| PD Clustering | $2, \ldots, 5$ | --- | Silhouette | CH, prob. silhouette |
+| FPDC | $2, \ldots, 8$ | $2, \ldots, 5$ | Silhouette | CH, prob. silhouette |
 
-To improve efficiency, results for each embedding size and cluster count were cached and reused across runs. For each embedding representation, the final model was selected using the highest average silhouette score, while CH and probability silhouette were used as additional diagnostic measures. The resulting clusters were then examined through cluster size summaries and two-dimensional PCA projections to visualize the overall cluster structure.
-
-## Factorial Probabilistic Distance Clustering
-We evaluated Factorial Probabilistic Distance Clustering (FPDC) on user embeddings of sizes 64, 128, and 256. Before clustering, each embedding matrix was standardized so that all dimensions contributed on a comparable scale. For each embedding size, FPDC was applied over a grid of candidate values for the number of clusters and factor dimension, with $k \in \{2, \dots, 8\}$ and $q \in \{2, \dots, 5\}$. For every $(k, q)$ combination, clustering quality was evaluated using the average silhouette score, Calinski--Harabasz (CH) index, and probability silhouette.
-
-To improve efficiency, results for each FPDC configuration were cached and reused across runs. For each embedding representation, the final model was selected primarily according to the highest average silhouette score, while CH and probability silhouette were used as supporting diagnostics. The resulting cluster solutions were then summarized using cluster size distributions and visualized through two-dimensional PCA projections of the embeddings.
+Table: Tuning ranges and model selection criteria for each clustering method.
