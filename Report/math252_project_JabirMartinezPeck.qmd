@@ -34,7 +34,26 @@ knitr::opts_chunk$set(
   fig.height = 5.5,
   dpi = 120
 )
+
+library(dplyr)
+library(ggplot2)
+library(knitr)
+library(scales)
+
+source("compare_results_helpers.R")
+
+compare_results <- build_compare_results_data(
+  cache_root = file.path("..", "output", "benchmark_cache")
+)
+
+plot_df <- compare_results$plot_df
+best_models_df <- compare_results$best_models_df
+best_table <- compare_results$best_table
+overall_best <- compare_results$overall_best
+ari_df <- compare_results$ari_df
+ari_summary <- compare_results$ari_summary
 ```
+
 
 \begin{center}
 \textbf{Clustering Analysis (Math 252)}\\

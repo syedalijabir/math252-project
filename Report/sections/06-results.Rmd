@@ -11,3 +11,57 @@ Structure:
 [ADD LATER: TABLES + PLOTS.]
 
 [ADD LATER: OBSERVATIONS (E.G., "HIGHER DIMENSION IMPROVES SEPARATION BUT INCREASES VARIANCE").]
+
+
+# `Report/sections/06-results.Rmd`
+
+# Results
+
+This section compares clustering performance across embedding dimensions and methods using average silhouette width as the primary selection criterion, with the Calinski--Harabasz index and runtime used as secondary criteria. All figures and tables below are generated directly from cached `.rds` outputs so that the report stays reproducible without rerunning the full clustering pipeline during rendering.
+
+## Best model by method and embedding dimension
+
+```{r tbl-best-models}
+knitr::kable(
+  best_table,
+  booktabs = TRUE,
+  caption = "Best clustering result for each method and embedding dimension."
+)
+```
+
+Across all method--embedding combinations, the highest silhouette value in the cached results was obtained by `r as.character(overall_best$method)` using the `r overall_best$embedding_dim`-dimensional embeddings with `r overall_best$k` clusters`r if (!is.na(overall_best$q)) paste0(" and q = ", overall_best$q) else ""`. This configuration achieved a silhouette score of `r round(overall_best$silhouette, 3)` and a Calinski--Harabasz value of `r round(overall_best$ch, 2)`.
+
+## Effect of embedding size
+
+```{r fig-best-silhouette, fig.cap="Best silhouette score attained by each clustering method within each embedding dimension."}
+plot_best_silhouette_by_method_embedding(plot_df)
+```
+
+The figure above compares the best silhouette score achieved by each method within each embedding dimension. This view is useful because it separates the representation-size comparison from the larger tuning grid over `k` and, where relevant, `q`.
+
+## Algorithm comparison and computational cost
+
+```{r fig-runtime-tradeoff, fig.cap="Runtime-performance tradeoff across all cached clustering models. Lower runtime and higher silhouette are preferred."}
+plot_runtime_vs_silhouette(plot_df)
+```
+
+The runtime-performance tradeoff plot helps distinguish methods that are competitive in clustering quality from those that impose substantially higher computational cost. It should be interpreted jointly with the best-model table rather than as a standalone model-selection rule.
+
+## Agreement across methods
+
+```{r fig-ari-method-pairs, fig.cap="Average adjusted Rand index by method pair, computed within matched embedding dimensions and values of k."}
+plot_ari_method_pairs(ari_df)
+```
+
+Adjusted Rand index (ARI) is used here as a stability and agreement measure across methods under comparable settings. Higher values indicate that two methods tend to recover more similar partitions when they are fit to the same embedding dimension and the same number of clusters.
+
+## Tuning patterns for the baseline methods
+
+```{r fig-silhouette-vs-k, fig.cap="Silhouette scores across candidate values of k for K-means and PD clustering, stratified by embedding dimension."}
+plot_silhouette_vs_k(plot_df, methods = c("KMeans", "PD"))
+```
+
+This final plot provides a compact view of how the tuning parameter `k` changes the clustering quality for the two baseline methods across the embedding dimensions. If you need to shorten the section, this is the first figure I would move to the appendix.
+
+
+
