@@ -3,7 +3,8 @@ title: "MovieLens 1M: Bootstrap Stability for PD Clustering"
 author: ""
 date: "`r format(Sys.Date())`"
 output:
-  pdf_document: default
+  pdf_document:
+    latex_engine: xelatex
 fontsize: 11pt
 geometry: margin=1in
 ---
