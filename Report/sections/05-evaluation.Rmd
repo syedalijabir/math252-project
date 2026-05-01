@@ -9,3 +9,10 @@ A second component concerns stability. Many clustering algorithms, especially pa
 A third component is interpretability. Because the MovieLens dataset includes movie genres and potentially user covariates, the resulting user clusters can be examined to determine whether they correspond to meaningful preference patterns or rating behaviors. This interpretive step matters because a mathematically compact clustering is not necessarily substantively useful.
 
 The final report should state clearly which metrics were used, how many repeated runs were performed, and how the best overall method was selected. If dimensionality-reduction visualizations such as PCA or t-SNE are included, they should be used as qualitative support rather than primary evidence.
+
+## K-means
+We evaluated standard k-means clustering on user embeddings of sizes 64, 128, and 256. Before clustering, each embedding matrix was standardized to ensure that all dimensions contributed comparably to the distance calculations. For each embedding size, we tested cluster counts in the range $k \in \{2, \dots, 20\}$ using three k-means variants: Hartigan-Wong, and MacQueen. The number of clusters was selected primarily using the elbow method based on within-cluster sum of squares (WSS), while the average silhouette score and Calinski--Harabasz (CH) index were used as supporting diagnostics to assess clustering quality.
+
+## Reduced k-means
+
+For clustering evaluation, we applied Reduced K-Means (RKM) to user embeddings of sizes 64, 128, and 256. Prior to clustering, all embedding vectors were standardized to have zero mean and unit variance. We performed a grid search over the number of clusters $k \in \{2, \dots, 10\}$ and reduced dimensionality $q \in \{2, \dots, 6\}$, evaluating each configuration using both the average silhouette score and the Calinski--Harabasz (CH) index. To improve computational efficiency, intermediate results for each $(k, q)$ combination were cached and reused across runs. For each embedding size, the best model was selected based on the highest silhouette score, with the CH index used as a secondary criterion.
