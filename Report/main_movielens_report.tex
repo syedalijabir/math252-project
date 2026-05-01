@@ -1,0 +1,523 @@
+% Options for packages loaded elsewhere
+\PassOptionsToPackage{unicode}{hyperref}
+\PassOptionsToPackage{hyphens}{url}
+\documentclass[
+  11pt,
+]{article}
+\usepackage{xcolor}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb}
+\setcounter{secnumdepth}{-\maxdimen} % remove section numbering
+\usepackage{iftex}
+\ifPDFTeX
+  \usepackage[T1]{fontenc}
+  \usepackage[utf8]{inputenc}
+  \usepackage{textcomp} % provide euro and other symbols
+\else % if luatex or xetex
+  \usepackage{unicode-math} % this also loads fontspec
+  \defaultfontfeatures{Scale=MatchLowercase}
+  \defaultfontfeatures[\rmfamily]{Ligatures=TeX,Scale=1}
+\fi
+\usepackage{lmodern}
+\ifPDFTeX\else
+  % xetex/luatex font selection
+\fi
+% Use upquote if available, for straight quotes in verbatim environments
+\IfFileExists{upquote.sty}{\usepackage{upquote}}{}
+\IfFileExists{microtype.sty}{% use microtype if available
+  \usepackage[]{microtype}
+  \UseMicrotypeSet[protrusion]{basicmath} % disable protrusion for tt fonts
+}{}
+\makeatletter
+\@ifundefined{KOMAClassName}{% if non-KOMA class
+  \IfFileExists{parskip.sty}{%
+    \usepackage{parskip}
+  }{% else
+    \setlength{\parindent}{0pt}
+    \setlength{\parskip}{6pt plus 2pt minus 1pt}}
+}{% if KOMA class
+  \KOMAoptions{parskip=half}}
+\makeatother
+\usepackage{graphicx}
+\makeatletter
+\newsavebox\pandoc@box
+\newcommand*\pandocbounded[1]{% scales image to fit in text height/width
+  \sbox\pandoc@box{#1}%
+  \Gscale@div\@tempa{\textheight}{\dimexpr\ht\pandoc@box+\dp\pandoc@box\relax}%
+  \Gscale@div\@tempb{\linewidth}{\wd\pandoc@box}%
+  \ifdim\@tempb\p@<\@tempa\p@\let\@tempa\@tempb\fi% select the smaller of both
+  \ifdim\@tempa\p@<\p@\scalebox{\@tempa}{\usebox\pandoc@box}%
+  \else\usebox{\pandoc@box}%
+  \fi%
+}
+% Set default figure placement to htbp
+\def\fps@figure{htbp}
+\makeatother
+\setlength{\emergencystretch}{3em} % prevent overfull lines
+\providecommand{\tightlist}{%
+  \setlength{\itemsep}{0pt}\setlength{\parskip}{0pt}}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{array}
+\usepackage{float}
+\usepackage{setspace}
+\usepackage{graphicx}
+\usepackage{caption}
+\usepackage{hyperref}
+\usepackage{bookmark}
+\IfFileExists{xurl.sty}{\usepackage{xurl}}{} % add URL line breaks if available
+\urlstyle{same}
+\hypersetup{
+  pdftitle={Reel Intelligence: MovieLens Clustering},
+  pdfauthor={Ali Jabir; Isis Martínez; Susan Peck},
+  hidelinks,
+  pdfcreator={LaTeX via pandoc}}
+
+\title{Reel Intelligence: MovieLens Clustering}
+\usepackage{etoolbox}
+\makeatletter
+\providecommand{\subtitle}[1]{% add subtitle to \maketitle
+  \apptocmd{\@title}{\par {\large #1 \par}}{}{}
+}
+\makeatother
+\subtitle{Final Project Report, Spring 2026}
+\author{Ali Jabir \and Isis Martínez \and Susan Peck}
+\date{May 2, 2026}
+
+\begin{document}
+\maketitle
+
+\begin{center}
+\textbf{Clustering Analysis (Math 252)}\\
+Professor: Dr. Cristina Tortora\\
+Department of Computer Science\\
+San Jose State University
+\end{center}
+
+\section{Abstract}\label{abstract}
+
+TBD
+
+{[}NOTE: ADD ANY OTHER INFORMATION NEEDED WITH CODE AND RESULTS LATER{]}
+
+{[}ADD 3 DIFFERENT DATASETS{]}
+
+\section{Introduction}\label{introduction}
+
+Clustering is a core unsupervised learning technique used to identify
+structure in high-dimensional data without labeled outcomes. In
+movie-rating data, clustering offers a different perspective from
+prediction-based recommender systems by focusing on groups of users with
+similar behavior rather than forecasting future ratings.
+
+Although this study is motivated by data commonly used in recommender
+systems, it does not evaluate recommendation accuracy or predictive
+performance. Instead, it assesses clustering quality in learned
+embedding spaces. Coherent cluster structure in these embeddings may
+still have downstream relevance for personalization, recommendation, and
+content organization.
+
+The MovieLens datasets are widely used benchmarks in machine learning
+and recommender-systems research because they contain rich user-movie
+rating information. In this project, we use the MovieLens 1M dataset and
+cluster user embeddings learned from the rating data. We consider
+embedding dimensions of 64, 128, and 256 and compare four clustering
+methods: k-means, probabilistic distance (PD) clustering, reduced
+k-means, and factorial probabilistic distance clustering (FPDC). The
+goal is to evaluate how embedding dimension and clustering method
+jointly affect the quality, stability, and interpretability of
+clustering solutions.
+
+This report is organized as follows. \hyperref[background]{Section II}
+reviews the clustering methods used in the study.
+\hyperref[dataset]{Section III} describes the dataset and preprocessing
+pipeline. \hyperref[methods-and-experimental-setup]{Section IV} presents
+the embedding model and clustering implementation.
+\hyperref[evaluation-framework]{Section V} defines the evaluation
+framework. \hyperref[results]{Section VI} reports the experimental
+results. \hyperref[conclusion-and-future-work]{Section VII} concludes
+and discusses future work.
+
+\section{Background}\label{background}
+
+Clustering partitions observations into groups according to a notion of
+similarity or distance. In this study, clustering is performed in
+learned embedding spaces, so the geometry of the representation plays a
+central role in determining cluster quality.
+
+We consider four partition-based methods that differ along two key
+dimensions: (i) \textbf{hard vs.~probabilistic assignment}, and (ii)
+\textbf{clustering in the full space vs.~a learned lower-dimensional
+subspace}.
+
+\textbf{k-means} provides a natural baseline. It assigns each
+observation to a single cluster by minimizing within-cluster variation,
+and is computationally efficient and widely used. However, it implicitly
+favors roughly spherical, equally sized clusters and can be sensitive to
+initialization, scaling, and outliers.
+
+\textbf{Probabilistic distance (PD) clustering} replaces hard
+assignments with probabilistic memberships determined by distances to
+cluster centers. This produces a soft partition in which observations
+can belong to multiple clusters to varying degrees. As a result, PD
+clustering is typically more robust to overlap and noise, but at
+increased computational cost relative to k-means.
+
+High-dimensional settings motivate methods that jointly perform
+clustering and dimension reduction. In such cases, cluster structure may
+be more clearly expressed in a lower-dimensional subspace than in the
+original feature space.
+
+\textbf{Reduced k-means} extends k-means by simultaneously estimating a
+low-dimensional projection and a partition within that subspace. By
+concentrating on directions that are most relevant for clustering, it
+can recover structure that is obscured in the full space, while
+retaining the simplicity of hard assignments.
+
+\textbf{Factorial probabilistic distance clustering (FPDC)} combines the
+ideas of PD clustering and dimension reduction. It estimates a latent
+subspace together with probabilistic cluster memberships, effectively
+performing soft clustering in a learned representation. This allows FPDC
+to accommodate overlapping clusters while also mitigating the effects of
+high dimensionality.
+
+From this perspective, the four methods can be viewed along two
+orthogonal axes: assignment (hard vs.~probabilistic) and representation
+(original space vs.~learned subspace). These differences suggest
+potential trade-offs in robustness, interpretability, and computational
+cost.
+
+In addition to clustering quality, computational efficiency is an
+important consideration in high-dimensional settings. Methods that
+reduce dimension can lower per-iteration cost and memory usage, but may
+introduce additional overhead from estimating the subspace. For this
+reason, this study evaluates both clustering performance and
+computational scalability.
+
+Because clustering is unsupervised, validation relies on internal
+criteria, stability, and interpretability rather than labeled outcomes.
+In particular, the methods considered here may differ in their
+sensitivity to sampling variability. Probabilistic approaches can
+accommodate ambiguity in cluster boundaries, while subspace-based
+methods depend on how well the learned representation captures the
+underlying structure.
+
+To assess these differences, this study evaluates clustering
+\textbf{stability under bootstrap resampling}, using agreement between
+partitions as a primary criterion. Stability provides a complementary
+perspective to internal fit measures, especially in settings where
+cluster structure may be weak or sensitive to representation.
+Accordingly, the evaluation considers multiple complementary metrics
+rather than relying on a single measure.
+
+\section{Dataset}\label{dataset}
+
+We use the MovieLens 1M dataset as the primary dataset for this project.
+MovieLens 1M is a standard benchmark in recommender-systems research and
+contains approximately one million movie ratings from roughly six
+thousand users on roughly four thousand movies. Its size makes it
+suitable for experimenting with learned embeddings and multiple
+clustering procedures while remaining computationally manageable.
+
+In addition to MovieLens 1M, we use sampled subsets of the MovieLens 20M
+dataset for benchmarking. These subsets are used to assess whether
+clustering results remain stable across different samples drawn from a
+larger ratings dataset. This complements the main MovieLens 1M analysis
+by testing the methods on additional user--movie interaction data.
+
+The main files used in this analysis are the ratings data and movie
+metadata. The ratings data include user identifiers, movie identifiers,
+numeric ratings, and timestamps. The movie metadata include titles and
+genre labels, which are used later to interpret the resulting clusters.
+
+The preprocessing stage transforms the raw ratings data into a form
+suitable for representation learning and clustering. Because user--item
+data are sparse, users with very few ratings and movies with very low
+interaction frequency may be filtered out. This reduces noise and helps
+ensure that the learned embeddings reflect sufficient interaction
+history. Depending on the final embedding pipeline, ratings may be
+retained in their original form, normalized, or converted into
+implicit-feedback signals. The processed data are then used to train the
+embedding model and construct user representations for clustering.
+
+{[}WHAT TO ADD: EXACT THRESHOLDS AND FINAL SAMPLE DETAILS SHOULD BE
+INSERTED ONCE THE IMPLEMENTATION IS COMPLETE.{]}
+
+{[}REPORT THE FILTERING CRITERIA APPLIED TO USERS AND MOVIES.{]}
+
+{[}NUMBER OF OBSERVATIONS RETAINED AFTER PREPROCESSING.{]}
+
+{[}CONSTRUCTION OF THE SAMPLED MOVIELENS 20M BENCHMARK SUBSETS.{]}
+
+{[}ANY NORMALIZATION OR TRANSFORMATION PROCEDURES USED IN CONSTRUCTING
+THE MODEL INPUT.{]}
+
+{[}INCLUDE A BRIEF SUMMARY OF THE SPARSITY OF THE FINAL USER--ITEM
+MATRIX AND, IF RELEVANT, DESCRIPTIVE STATISTICS ABOUT RATINGS AND GENRE
+FREQUENCIES.{]}
+
+\section{Methods and Experimental
+Setup}\label{methods-and-experimental-setup}
+
+\subsection{Embeddings}\label{embeddings}
+
+The methodology consists of two stages. First, dense latent
+representations are learned from the MovieLens 1M data using an
+MLP-based embedding model. Second, clustering procedures are applied to
+those embeddings to determine which combinations of embedding dimension
+and clustering method yield the strongest grouping structure.
+
+The representation-learning component produces embeddings of dimensions
+64, 128, and 256. These dimensions are compared to evaluate how
+representation size affects clustering quality. Lower-dimensional
+embeddings may encourage more compact and stable structure, while
+higher-dimensional embeddings may capture subtler variation at the cost
+of greater complexity.
+
+The exact neural architecture should be documented in the final version
+of the report. This subsection should specify the input representation,
+the number and size of hidden layers, activation functions, optimizer,
+learning rate, batch size, number of training epochs, regularization
+choices, and the loss function used to train the embeddings. It should
+also state explicitly that clustering is applied to user embeddings.
+
+{[}ADD EXACT NEURAL ARCHITECTURE DETAILS.{]}
+
+{[}ADD LOSS FUNCTION.{]}
+
+{[}ADD OPTIMIZER, LEARNING RATE, BATCH SIZE, EPOCHS, AND
+REGULARIZATION.{]}
+
+After the embeddings are learned, clustering is performed separately in
+each embedding space. The four clustering methods considered are
+k-means, PD clustering, reduced k-means, and FPDC. The experimental
+design applies each method to each embedding dimension in order to
+compare clustering behavior across both representation size and
+clustering algorithm.
+
+The number of clusters considered, the procedure used to select that
+value, the initialization strategy, stopping criteria, and the number of
+repeated runs should all be stated explicitly in the final version.
+These choices affect both clustering quality and computational cost.
+
+{[}ADD NUMBER OF CLUSTERS CONSIDERED.{]}
+
+{[}ADD CLUSTER-SELECTION PROCEDURE.{]}
+
+{[}ADD INITIALIZATION STRATEGIES, STOPPING CRITERIA, AND NUMBER OF
+REPEATED RUNS.{]}
+
+Clustering is not performed directly on the raw sparse rating matrix.
+Instead, the embedding model transforms sparse user--item behavior into
+a lower-dimensional representation on which clustering is applied.
+
+\subsection{Clustering Implementation in
+R}\label{clustering-implementation-in-r}
+
+{[}NEED CITATIONS{]}
+
+All clustering analyses were conducted in R using standardized
+user-embedding matrices derived from the MovieLens data. Embedding files
+were imported with the \texttt{readr} package, and the first column
+containing user identifiers was separated from the embedding
+coordinates. The remaining embedding features were converted to a
+numeric matrix and standardized using \texttt{scale()} so that all
+dimensions contributed comparably to distance-based calculations.
+Pairwise Euclidean distances were computed using \texttt{dist()} and
+were used in silhouette-based evaluation. Additional data manipulation
+and plotting were performed with \texttt{dplyr} and \texttt{ggplot2},
+respectively.
+
+For k-means clustering, the implementation used the base R function
+\texttt{kmeans()} from the \texttt{stats} package. Candidate numbers of
+clusters were evaluated over the range
+
+\[
+k \in \{2,\dots,20\}.
+\]
+
+In the tuning stage, k-means was run with \texttt{nstart\ =\ 10} and
+\texttt{iter.max\ =\ 100}, and three algorithmic variants were compared:
+Hartigan--Wong, Lloyd, and MacQueen. For the final fitted model, k-means
+was refit with \texttt{nstart\ =\ 100} and \texttt{iter.max\ =\ 100}
+using the default Hartigan--Wong algorithm. Model quality was assessed
+using total within-cluster sum of squares from the fitted object,
+average silhouette width computed with \texttt{silhouette()} from the
+\texttt{cluster} package, and the Calinski--Harabasz index computed with
+\texttt{intCriteria()} from the \texttt{clusterCrit} package. In a
+separate comparison script, k-means was also run for fixed values
+
+\[
+k \in \{3,4,5,6,7,8,9,10\}
+\]
+
+using \texttt{nstart\ =\ 100}, \texttt{iter.max\ =\ 100}, and
+\texttt{algorithm\ =\ "MacQueen"} to compare its partitions with reduced
+k-means using the adjusted Rand index from the \texttt{mclust} package.
+
+For reduced k-means, the implementation used the \texttt{cluspca()}
+function from the \texttt{clustrd} package. Models were fit over the
+grid
+
+\[
+k \in \{2,\dots,10\}, \qquad q \in \{2,\dots,6\}.
+\]
+
+Each model was fit as
+\texttt{cluspca(embedding\_matrix,\ nclus\ =\ k\_val,\ ndim\ =\ q\_val,\ method\ =\ "RKM",\ rotation\ =\ "varimax")}.
+For each \((k,q)\) combination, average silhouette width was computed
+using \texttt{silhouette()} from the \texttt{cluster} package and the
+Calinski--Harabasz index was computed with \texttt{intCriteria()} from
+\texttt{clusterCrit}. The best reduced k-means model for each embedding
+file was selected using the highest silhouette value, and intermediate
+results were cached to \texttt{.rds} files.
+
+Probabilistic distance clustering was implemented in R using the
+\texttt{pdclust()} function on the standardized embedding matrices.
+Models were fit over the range
+
+\[
+k \in \{2,3,4,5\}
+\]
+
+using Euclidean distance. For each value of \(k\), the algorithm
+produced a matrix of posterior membership probabilities, from which hard
+cluster assignments were obtained by assigning each observation to the
+cluster with the highest probability. Cluster centers were estimated
+internally by the algorithm from these probabilistic assignments.
+Clustering performance was evaluated using average silhouette width
+computed with \texttt{silhouette()} from the \texttt{cluster} package,
+the Calinski--Harabasz index computed using \texttt{intCriteria()} from
+the \texttt{clusterCrit} package, and a probability-based silhouette
+measure computed with \texttt{Silh()}. All fitted models and evaluation
+metrics were saved to \texttt{.rds} files to support reproducibility and
+avoid recomputation.
+
+For factorial probabilistic distance clustering (FPDC), the
+implementation used the \texttt{FPDC()} function from the
+\texttt{FPDclustering} package. The standardized embedding matrices were
+evaluated over the grid
+
+\[
+k \in \{2,\dots,8\}, \qquad q \in \{2,\dots,5\}.
+\]
+
+Each model was fit as
+\texttt{FPDC(embedding\_matrix,\ k\_val,\ 20,\ q\_val,\ nu\ =\ 10)}, so
+the implementation used 20 internal iterations and a tuning parameter
+fixed at
+
+\[
+\nu = 10.
+\]
+
+For each parameter combination, clustering quality was evaluated using
+average silhouette width computed from hard labels with
+\texttt{silhouette()} from the \texttt{cluster} package, the
+Calinski--Harabasz index from \texttt{clusterCrit}, and the
+probability-based silhouette returned by \texttt{Silh()} from
+\texttt{FPDclustering}. The best FPDC solution for each embedding file
+was selected using silhouette as the primary criterion and
+Calinski--Harabasz as a secondary criterion. Each fit was cached to
+\texttt{.rds} files, and summary outputs were written to \texttt{.csv}
+files.
+
+\section{Test Setup and Evaluation}\label{test-setup-and-evaluation}
+
+Because this project is unsupervised, evaluation is based on internal
+validation, stability, and interpretability rather than labeled test
+outcomes. The evaluation framework therefore compares clustering
+outcomes along several complementary dimensions.
+
+The first component consists of internal validation metrics. These
+metrics assess cluster compactness and separation. One key metric is the
+silhouette score, which measures how similar an observation is to its
+own cluster relative to the nearest competing cluster. Higher silhouette
+values indicate stronger separation and better-defined structure.
+Another criterion is within-cluster sum of squares, which measures
+variation around assigned centroids. Smaller values indicate tighter
+clustering, although this quantity generally decreases as the number of
+clusters increases. Additional indices such as the Davies--Bouldin index
+may also be used to broaden the comparison of compactness and
+separation.
+
+A second component concerns stability. Many clustering algorithms,
+especially partition-based methods, are sensitive to initialization and
+local optima. For this reason, clustering configurations should be run
+multiple times, and the consistency of the resulting partitions should
+be assessed. Stability can be measured using indices such as adjusted
+Rand similarity. A method that yields highly variable solutions across
+repeated runs may be less reliable even if its internal metrics appear
+strong in a single run.
+
+A third component is interpretability. Because the MovieLens dataset
+includes movie genres and potentially user covariates, the resulting
+user clusters can be examined to determine whether they correspond to
+meaningful preference patterns or rating behaviors. This interpretive
+step matters because a mathematically compact clustering is not
+necessarily substantively useful.
+
+The final report should state clearly which metrics were used, how many
+repeated runs were performed, and how the best overall method was
+selected. If dimensionality-reduction visualizations such as PCA or
+t-SNE are included, they should be used as qualitative support rather
+than primary evidence.
+
+\section{Results}\label{results}
+
+Structure:
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  Effect of embedding size: compare 64 vs.~128 vs.~256.
+\item
+  Algorithm comparison: k-means vs.~PD vs.~reduced k-means vs.~FPDC.
+\item
+  Best model selection based on validation metrics.
+\end{enumerate}
+
+{[}ADD LATER: ALL NUMERIC RESULTS.{]}
+
+{[}ADD LATER: TABLES + PLOTS.{]}
+
+{[}ADD LATER: OBSERVATIONS (E.G., ``HIGHER DIMENSION IMPROVES SEPARATION
+BUT INCREASES VARIANCE'').{]}
+
+\section{Conclusion and Future Work}\label{conclusion-and-future-work}
+
+This project studies clustering on learned user embeddings derived from
+the MovieLens 1M dataset. By comparing embeddings of dimensions 64, 128,
+and 256 across four clustering methods---k-means, PD clustering, reduced
+k-means, and FPDC---the analysis evaluates how representation size and
+clustering method affect unsupervised structure discovery.
+
+The study brings together partition-based clustering, dimension
+reduction, latent-factor methods, and cluster validation within a
+representation-learning framework. Although recommendation performance
+is not evaluated, the resulting cluster structure may still be relevant
+to downstream tasks such as personalization, interpretation, and content
+organization.
+
+Future work could extend the analysis by incorporating additional
+clustering methods covered in the course, such as spectral clustering,
+fuzzy clustering, model-based mixture methods, or clustering with
+covariates. Another extension would be to include richer user or movie
+metadata in order to study clustering in augmented feature spaces. It
+would also be useful to compare MLP-based embeddings with embeddings
+learned through alternative architectures such as autoencoders or other
+latent-variable models.
+
+\section{Appendix}\label{appendix}
+
+You can see our entire code at our GitHub repository.
+
+{[}WE SHOULD CITE THE PAPERS WE READ ABOUT THE DIFFERENT CLUSTERING
+METHODS!{]}
+
+\section{References}\label{references}
+
+\end{document}

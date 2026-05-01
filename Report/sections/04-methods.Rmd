@@ -4,9 +4,18 @@
 
 The methodology consists of two stages. First, dense latent representations are learned from the MovieLens 1M data using an MLP-based embedding model. Second, clustering procedures are applied to those embeddings to determine which combinations of embedding dimension and clustering method yield the strongest grouping structure.
 
-The representation-learning component produces embeddings of dimensions 64, 128, and 256. These dimensions are compared to evaluate how representation size affects clustering quality. Lower-dimensional embeddings may encourage more compact and stable structure, while higher-dimensional embeddings may capture subtler variation at the cost of greater complexity.
+To generate user embeddings, we first constructed a user--item interaction matrix from the MovieLens 1M dataset. Each row corresponds to a user and each column corresponds to a movie, resulting in an input dimensionality of 3706 (i.e., the total number of unique movies). Since the matrix is sparse, we applied mean-centering by subtracting the average rating of each movie, followed by imputing missing values with zeros. This normalization helps stabilize the input distribution and removes global rating biases across movies.
 
-The exact neural architecture should be documented in the final version of the report. This subsection should specify the input representation, the number and size of hidden layers, activation functions, optimizer, learning rate, batch size, number of training epochs, regularization choices, and the loss function used to train the embeddings. It should also state explicitly that clustering is applied to user embeddings.
+We then used a fully connected neural network (Multi-Layer Perceptron, MLP) to project the high-dimensional user vectors into a lower-dimensional latent space. The network takes a 3706-dimensional input vector and passes it through a hidden layer of size 512, followed by a non-linear activation (Sigmoid). A second linear layer maps this representation to a compact embedding space. We experimented with multiple embedding sizes of 64, 128, and 256 to study the effect of representation capacity.
+
+Figure \ref{fig:mlp_architecture} illustrates the architecture of the network used for embedding generation.
+
+\begin{figure}[h]
+    \centering
+    % \includegraphics[width=0.6\textwidth]{figures/mlp_architecture.png}
+    \caption{MLP architecture for user embedding generation (input: 3706, hidden: 512, output: embedding size).}
+    \label{fig:mlp_architecture}
+\end{figure}
 
 [ADD EXACT NEURAL ARCHITECTURE DETAILS.]
 
