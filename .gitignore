@@ -17,3 +17,5 @@ km_files/
 pd_files/
 fpdc_files/
 output/
+*.rds
+archive/
