@@ -139,18 +139,27 @@ load_best_cached_rkm_for_k <- function(embedding_tag, k_val, q_vals = 2:6,
       paste0("rkm_", embedding_tag, "_k", k_val, "_q", q_val, ".rds")
     )
 
-    if (file.exists(cache_file)) {
-      cached <- readRDS(cache_file)
+    if (!file.exists(cache_file)) next
 
-      candidates[[length(candidates) + 1]] <- list(
-        k          = k_val,
-        q          = q_val,
-        model      = cached$model,
-        silhouette = cached$Silhouette,
-        ch         = cached$CH,
-        file       = cache_file
-      )
+    cached <- readRDS(cache_file)
+
+    # Guard: skip if either metric is missing, NULL, NA, or not length 1
+    sil_ok <- !is.null(cached$Silhouette) && length(cached$Silhouette) == 1 && is.finite(cached$Silhouette)
+    ch_ok  <- !is.null(cached$CH)         && length(cached$CH)         == 1 && is.finite(cached$CH)
+
+    if (!sil_ok || !ch_ok) {
+      cat("    Skipping q =", q_val, "— missing or invalid metrics in cache\n")
+      next
     }
+
+    candidates[[length(candidates) + 1]] <- list(
+      k          = k_val,
+      q          = q_val,
+      model      = cached$model,
+      silhouette = cached$Silhouette,
+      ch         = cached$CH,
+      file       = cache_file
+    )
   }
 
   if (length(candidates) == 0) return(NULL)
