@@ -65,11 +65,11 @@ San Jose State University
 
 # Abstract
 
-TBD
+This study evaluates clustering structure in user embeddings learned from the MovieLens 1M dataset. We generate embeddings using a multilayer perceptron and examine three embedding dimensions (64, 128, and 256). Four clustering methods are compared: k-means, probabilistic distance (PD) clustering, reduced k-means, and factorial probabilistic distance clustering (FPDC). Because no ground-truth labels are available, evaluation is based on internal validation metrics, bootstrap stability, partition agreement, and runtime.
 
-[NOTE: ADD ANY OTHER INFORMATION NEEDED WITH CODE AND RESULTS LATER]
+The results provide only modest evidence of clustering structure in the learned embeddings. Reduced K-means produces the strongest and most consistent hard partitions, particularly in the 128-dimensional embedding space. K-means recovers similar structure but is sensitive to the choice of tuning criterion. In contrast, PD clustering and FPDC do not yield stable or well-separated partitions under the evaluation framework used in this study. Across methods, the 128-dimensional embeddings provide the clearest clustering signal.
 
-[ADD 3 DIFFERENT DATASETS]
+Overall, the findings suggest that while embedding-based representations of user behavior contain some clustering tendency, the resulting structure is weak and sensitive to modeling choices, limiting strong interpretation of distinct user groups.
 
 ```{r child="sections/01-introduction.Rmd"}
 ```
