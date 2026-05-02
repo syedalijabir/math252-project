@@ -126,30 +126,24 @@ much less stable partitions.
 
 ## Stability Analysis {#sec-stability}
 
-Figures \ref{fig:kmeans-stability} through \ref{fig:fpdc-stability} summarize
-bootstrap stability. K-means and RKM remain the only methods that produce clearly
-reproducible partitions. In Figure \ref{fig:kmeans-stability}, the 128-dimensional and
-256-dimensional embeddings show their highest mean bootstrap adjusted Rand index at 2
-clusters and then weaken by 4 clusters. The 64-dimensional embedding shows weaker
-stability overall and a small local increase at 3 clusters, but the 4-cluster solution
-still performs poorly. This stability pattern does not match the elbow-based K-means
-selector, which again shows that the K-means conclusion depends strongly on which
-tuning rule takes precedence.
+K-means and RKM are the only methods that produce clearly reproducible partitions.
+Across embedding dimensions, both methods show their highest mean bootstrap ARI at 2
+clusters, with stability weakening as the number of clusters increases. This pattern is
+especially consistent for RKM and supports the final two-cluster RKM solutions. For
+K-means, the stability results favor 2 clusters, which contrasts with the elbow-based
+selection of 4 clusters and highlights the sensitivity of K-means to the chosen tuning
+criterion.
 
-Figure \ref{fig:rkm-stability} shows a more coherent pattern for RKM. The
-128-dimensional and 256-dimensional embeddings again reach their strongest stability at
-2 clusters, and the 64-dimensional embedding weakens as the number of clusters
-increases. These results agree with the RKM selection rule and support the final
-two-cluster RKM solutions.
+PD and FPDC do not exhibit comparable reproducibility. PD maintains mean bootstrap ARI
+values near zero across almost all settings, which indicates that its partitions are
+not stable under resampling. FPDC shows slightly positive stability in some settings,
+but the values remain low and inconsistent. Occasional local increases around 3
+clusters are not large enough to provide evidence of a reliable partition.
 
-PD and FPDC do not show the same reproducibility. Figure \ref{fig:pd-stability} keeps
-the mean bootstrap adjusted Rand index at or near zero in almost every setting, which
-indicates that bootstrap resamples do not reproduce the full-data PD partition
-reliably. Figure \ref{fig:fpdc-stability} shows slightly positive values in some
-settings, but the values remain clustered close to zero and do not provide strong
-evidence for a reproducible partition. FPDC occasionally shows a small local increase
-around 3 clusters, but the magnitude is too small to overturn the broader conclusion
-that FPDC remained unstable relative to K-means and RKM.
+Overall, the stability analysis reinforces the earlier results: only RKM and K-means recover a reproducible
+structure for two clusters, while PD and FPDC yield unstable partitions. Bootstrap stability plots of
+mean ARI across clustering method, embedding dimension, and number of clusters are
+provided in Appendix \ref{sec-appendix}.
 
 ## FPDC Sensitivity to the Tuning Parameter $\nu$ {#sec-fpdc-nu}
 
