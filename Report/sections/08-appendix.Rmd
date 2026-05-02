@@ -16,10 +16,6 @@ This appendix collects supporting diagnostics that informed model selection but 
 plot_rkm_sensitivity(plot_df)
 ```
 
-```{r fig-prob-silhouette, fig.cap="Probability silhouette values for PD and FPDC across the candidate tuning grid."}
-plot_prob_silhouette(plot_df)
-```
-
 ## Agreement summary table
 
 ```{r tbl-ari-summary}

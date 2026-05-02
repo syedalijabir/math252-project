@@ -59,7 +59,7 @@ ari_summary <- compare_results$ari_summary
 \begin{center}
 \textbf{Clustering Analysis (Math 252)}\\
 Professor: Dr. Cristina Tortora\\
-Department of Computer Science\\
+Department of Statistics\\
 San Jose State University
 \end{center}
 

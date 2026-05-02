@@ -36,12 +36,12 @@ We recorded wall-clock runtime for every cached model fit and used runtime as an
 \resizebox{\textwidth}{!}{
 \begin{tabular}{llllll}
 \toprule
-Method & Cluster-count range & Retained-factors & Primary criterion & Secondary criterion & Tertiary criterion \\
+Method & Cluster-counts & Retained-factors & $1^{st}$ criterion & $2^{nd}$ criterion & $3^{rd}$ criterion \\
 \midrule
-KM & 2-20 & -- &  WSS elbow diagnostic & Avg. silhouette width & CH \\
-RKM & 2-10 & 2-6 & Avg. silhouette width for all (k,q) combinations & CH & Bootstrap stability \\
-PDC & 2-5 & -- & Probability silhouette & Avg. silhouette width & CH \\
-FPDC & 2-8 & 2-5 & Probability silhouette for all (k,q, $\nu$) combinations &  silhouette width & CH index \\
+KM & 2--20 & -- &  WSS elbow diagnostic & Avg. silhouette width & CH \\
+RKM & 2--10 & 2--6 & Avg. silhouette width for all (k,q) combinations & CH & Bootstrap stability \\
+PDC & 2--5 & -- & Probability silhouette & Avg. silhouette width & CH \\
+FPDC & 2--8 & 2--5 & Probability silhouette for all (k,q, $\nu$) combinations &  Silhouette width & CH index \\
 \bottomrule
 \end{tabular}
 }
