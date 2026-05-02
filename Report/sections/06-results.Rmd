@@ -1,9 +1,9 @@
 # Results {#sec-results}
 
 This section compares clustering performance across embedding dimensions and methods
-using average silhouette width as the primary criterion, with the Calinski-Harabasz
-(CH) index, runtime, and bootstrap stability as secondary criteria. All results are
-generated directly from cached `.rds` outputs.
+using the pre-specified method-specific tuning criteria, with average silhouette width,
+the Calinski-Harabasz (CH) index, runtime, and bootstrap stability used to interpret
+the selected solutions.
 
 \begin{table}[htbp]
 \centering
@@ -53,4 +53,122 @@ strongest selected solution.
 Figure \ref{fig:best-silhouette-by-method} summarizes the best selected silhouette
 value for each method and embedding dimension. The figure shows that the
 128-dimensional embeddings still provide the clearest overall structure, but the
-selected winner now depends on the tuning rule attached to
+selected winner now depends on the tuning rule attached to each method. RKM dominates K-means under the revised criteria because RKM directly
+selects its best model by silhouette, while K-means now selects its model by the elbow
+diagnostic. The 64-dimensional embeddings appear too compressed to capture the full
+geometry of user preferences, while the 256-dimensional embeddings retain useful
+structure but do not surpass the 128-dimensional representations.
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.88\textwidth]{figures/figure3_best_silhouette_by_method_embedding.png}
+    \caption{Best selected silhouette value by method and embedding dimension under the
+    pre-specified method-specific tuning rules.}
+    \label{fig:best-silhouette-by-method}
+\end{figure}
+
+Figure \ref{fig:runtime-tradeoff} compares runtime and clustering quality for the
+final selected models. PD ran fastest in every embedding dimension, with runtimes
+between 0.18 and 0.29 seconds, but it produced ordinary silhouette values at or near
+zero. K-means ran much faster than RKM and FPDC, with selected-model runtimes of 7.35,
+12.72, and 23.45 seconds, but the elbow-selected K-means models did not produce strong
+hard partitions. RKM required 184.10 to 278.90 seconds because it jointly estimated a
+partition and a lower-dimensional subspace. FPDC required 70.74 to 241.74 seconds for
+the selected models and still produced weak or negative ordinary silhouettes. In
+practical terms, RKM delivered the best hard-clustering quality, but it did so at
+substantially higher computational cost than K-means or PD.
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.88\textwidth]{figures/figure_runtime_tradeoff.png}
+    \caption{Runtime and clustering quality for the final selected models.}
+    \label{fig:runtime-tradeoff}
+\end{figure}
+
+Figure \ref{fig:runtime-tradeoff} therefore serves as an empirical complexity summary:
+methods with larger tuning grids and more expensive updates move to the right, and only
+RKM shows a clear quality gain that partly justifies that extra cost.
+
+PD selected 2 clusters in all three embedding dimensions because probability silhouette
+favored that solution throughout the PD grid. Even so, the selected PD models remained
+weak: the ordinary silhouette values were 0.003, 0.000, and 0.000 in the 64-, 128-, and
+256-dimensional embeddings, and the probability silhouettes were only 0.093, 0.068,
+and 0.062. These results indicate that PD did not recover a strong hard partition in
+the learned user embeddings.
+
+FPDC performed better than PD on the probability-silhouette criterion, but it still did
+not recover competitive hard partitions. In the 64-dimensional embedding, FPDC selected
+2 clusters, 4 retained factors, and $\nu=6$, with probability silhouette 0.143 and
+ordinary silhouette 0.012. In the 128-dimensional embedding, FPDC selected 4 clusters,
+2 retained factors, and $\nu=6$, with probability silhouette 0.136 and ordinary
+silhouette -0.115. In the 256-dimensional embedding, FPDC selected 6 clusters, 3
+retained factors, and $\nu=10$, with probability silhouette 0.148 and ordinary
+silhouette -0.209. FPDC therefore improved the soft-membership diagnostic relative to
+PD, but that improvement did not translate into a strong hard partition.
+
+Figure \ref{fig:ari-method-pairs} compares the final partitions across methods with
+average adjusted Rand index. K-means and RKM still show by far the strongest agreement,
+with average adjusted Rand index 0.586. This result indicates that both methods recover
+a closely related underlying structure, even though the revised K-means selection rule
+now reports 4 clusters. Method pairs involving PD or FPDC show much weaker agreement.
+FPDC versus RKM averages 0.061, FPDC versus K-means averages 0.060, FPDC versus PD
+averages 0.007, and both K-means versus PD and RKM versus PD average 0.001. These low
+values indicate that the probabilistic methods recovered fundamentally different and
+much less stable partitions.
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.85\textwidth]{figures/figure4_average_ari_by_method_pair.png}
+    \caption{Average adjusted Rand index by method pair. Higher values indicate stronger
+    agreement between partitions recovered by different clustering methods.}
+    \label{fig:ari-method-pairs}
+\end{figure}
+
+## Stability Analysis {#sec-stability}
+
+Figures \ref{fig:kmeans-stability} through \ref{fig:fpdc-stability} summarize
+bootstrap stability. K-means and RKM remain the only methods that produce clearly
+reproducible partitions. In Figure \ref{fig:kmeans-stability}, the 128-dimensional and
+256-dimensional embeddings show their highest mean bootstrap adjusted Rand index at 2
+clusters and then weaken by 4 clusters. The 64-dimensional embedding shows weaker
+stability overall and a small local increase at 3 clusters, but the 4-cluster solution
+still performs poorly. This stability pattern does not match the elbow-based K-means
+selector, which again shows that the K-means conclusion depends strongly on which
+tuning rule takes precedence.
+
+Figure \ref{fig:rkm-stability} shows a more coherent pattern for RKM. The
+128-dimensional and 256-dimensional embeddings again reach their strongest stability at
+2 clusters, and the 64-dimensional embedding weakens as the number of clusters
+increases. These results agree with the RKM selection rule and support the final
+two-cluster RKM solutions.
+
+PD and FPDC do not show the same reproducibility. Figure \ref{fig:pd-stability} keeps
+the mean bootstrap adjusted Rand index at or near zero in almost every setting, which
+indicates that bootstrap resamples do not reproduce the full-data PD partition
+reliably. Figure \ref{fig:fpdc-stability} shows slightly positive values in some
+settings, but the values remain clustered close to zero and do not provide strong
+evidence for a reproducible partition. FPDC occasionally shows a small local increase
+around 3 clusters, but the magnitude is too small to overturn the broader conclusion
+that FPDC remained unstable relative to K-means and RKM.
+
+## FPDC Sensitivity to the Tuning Parameter $\nu$ {#sec-fpdc-nu}
+
+We evaluated FPDC at $\nu = 2$, $\nu = 6$, and $\nu = 10$. Pilot runs with $\nu = 2$
+produced highly inconsistent solutions and did not improve either probability silhouette
+or ordinary silhouette beyond chance-like behavior, so we excluded $\nu = 2$ from the
+final sensitivity summary. Table \ref{tab:fpdc-nu-sensitivity} reports the best FPDC
+result within each retained $\nu$ value for each embedding dimension.
+
+The 64-dimensional embedding changed very little between $\nu = 6$ and $\nu = 10$.
+Both settings selected 2 clusters and 4 retained factors, and both produced probability
+silhouette 0.143 with ordinary silhouette about 0.012. The 128-dimensional embedding
+also changed very little between $\nu = 6$ and $\nu = 10$. Both settings selected 4
+clusters and 2 retained factors, and both produced probability silhouette near 0.136
+with negative ordinary silhouette. The 256-dimensional embedding showed the clearest
+difference. There, $\nu = 6$ selected 3 clusters and 2 retained factors, with
+probability silhouette 0.146, ordinary silhouette -0.056, and Calinski-Harabasz index
+63.41. By contrast, $\nu = 10$ selected 6 clusters and 3 retained factors, with
+slightly higher probability silhouette 0.148 but much worse ordinary silhouette -0.209
+and a lower Calinski-Harabasz index of 33.92. In this dataset, increasing $\nu$ could
+improve FPDC's soft-membership objective while degrading the corresponding hard
+partition.
