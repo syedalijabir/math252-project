@@ -1,11 +1,8 @@
 # Test Setup and Evaluation
 
-## Evaluation Framework
-
 Because the analysis has no ground-truth labels, we evaluated the clustering results with internal validation metrics, bootstrap stability, partition agreement, empirical runtime, and interpretability rather than external criteria.
 
-### Internal Validation Metrics
-
+## Internal Validation Metrics
 
 We used **average silhouette** [@kaufman1990finding] width as the main hard-clustering diagnostic for K-means and Reduced K-means. Silhouette width measures how much closer each user lies to its assigned cluster than to the nearest competing cluster, so larger values indicate better-separated and more coherent clusters. We used the **Calinski-Harabasz** (CH) index as a second hard-clustering diagnostic because it rewards high between-cluster dispersion and low within-cluster dispersion.
 
@@ -13,19 +10,19 @@ For PD clustering and FPDC, we also computed probability silhouette with `Silh()
 
 For K-means, we also reported total within-cluster sum of squares because it directly reflects the K-means objective. We used the within-cluster sum of squares curve as the primary K-means tuning diagnostic and extracted the elbow from the saved fitted models. Because within-cluster sum of squares decreases monotonically as the number of clusters increases, we interpreted the elbow as a method-specific structural diagnostic rather than as a measure of cluster separation.
 
-We selected each method with a **method-specific hierarchy** of criteria. For K-means, we used the within-cluster sum of squares elbow diagnostic as the primary rule, average silhouette width as the secondary rule, and the Calinski-Harabasz index as the tertiary rule. For Reduced K-means, we selected the final model over all combinations of cluster counts and retained factors with average silhouette width as the primary criterion and the Calinski-Harabasz index as the secondary criterion. For PD clustering, we selected the final model over cluster counts with probability silhouette as the primary criterion, ordinary silhouette as the secondary criterion, and the Calinski-Harabasz index as the tertiary criterion. For FPDC, we selected the final model over cluster counts, retained factors, and $\nu$ values with the same hierarchy: probability silhouette first, ordinary silhouette second, and the Calinski-Harabasz index third.
+We selected each method with a **method-specific hierarchy** of criteria shown in Table \ref{tab:tuning-summary}.
 
-### Stability
+## Stability
 
 We assessed bootstrap stability with 15 bootstrap replicates for each combination of method, embedding dimension, and cluster count [@everitt2011cluster]. In each replicate, we sampled 30\% of users with replacement, refit the clustering model on the bootstrap sample, and compared the resulting partition with the full-data reference partition by adjusted Rand index (ARI) [@kaufman1990finding]. Adjusted Rand index ranges from 0 for chance-level agreement to 1 for perfect agreement, so larger values indicate more reproducible solutions. For PD clustering and FPDC, we converted soft memberships to hard labels by assigning each user to the cluster with the highest membership probability before computing adjusted Rand index.
 
 We also compared the final partitions across methods with pairwise adjusted Rand indices computed within matched embedding dimensions and matched cluster counts. This comparison tells us whether different methods recover the same underlying structure or fundamentally different partitions.
 
-### Runtime and Computational Cost
+## Runtime and Computational Cost
 
 We recorded wall-clock runtime for every cached model fit and used runtime as an empirical measure of computational complexity. K-means and PD clustering mainly scale with repeated distance calculations between users and cluster centers, so they remain comparatively fast. Reduced K-means adds the cost of estimating and rotating a lower-dimensional subspace. FPDC adds both subspace estimation and iterative soft-membership updates, and it also tunes $\nu$. We therefore interpreted runtime jointly with fit quality: a more complex method should deliver a clear gain in clustering quality if it is going to justify higher computational cost.
 
-### Implementation Summary
+## Implementation Summary
 
 
 \begin{table}[htbp]
