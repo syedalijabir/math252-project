@@ -57,23 +57,23 @@ PD clustering and FPDC do not show the same reproducibility. Figure \ref{fig:pd-
 
 \begin{figure}[htbp]
     \centering
-    \includegraphics[width=0.88\textwidth]{figures/figure3_best_silhouette_by_method_embedding.pdf}
+    \includegraphics[width=0.88\textwidth]{figures/figure3_best_silhouette_by_method_embedding.png}
     \caption{Best selected silhouette value by method and embedding dimension under the pre-specified method-specific tuning rules.}
     \label{fig:best-silhouette-by-method}
 \end{figure}
 
 
-\begin{figure}[htbp]
+<!-- \begin{figure}[htbp]
     \centering
     \includegraphics[width=0.88\textwidth]{figures/figure2_runtime_vs_silhouette_best_models.pdf}
     \caption{Runtime--performance tradeoff for the final selected models. Lower runtime and higher silhouette indicate a more favorable practical tradeoff.}
     \label{fig:runtime-tradeoff}
-\end{figure}
+\end{figure} -->
 
 
 \begin{figure}[htbp]
     \centering
-    \includegraphics[width=0.85\textwidth]{figures/figure4_average_ari_by_method_pair.pdf}
+    \includegraphics[width=0.85\textwidth]{figures/figure4_average_ari_by_method_pair.png}
     \caption{Average adjusted Rand index by method pair. Higher values indicate stronger agreement between partitions recovered by different clustering methods.}
     \label{fig:ari-method-pairs}
 \end{figure}

@@ -27,18 +27,18 @@ knitr::kable(
 ```
 
 
-\begin{figure}[htbp]
+<!-- \begin{figure}[htbp]
     \centering
     \includegraphics[width=\textwidth]{figures/figure1_kmeans_macqueen_silhouette_vs_k.pdf}
     \caption{Average silhouette width across candidate cluster counts for MacQueen K-means. Silhouette peaks at 2 clusters in all three embedding dimensions, even though the elbow diagnostic selects 4 clusters.}
     \label{fig:kmeans-silhouette-k}
-\end{figure}
+\end{figure} -->
 
 
 
 \begin{figure}[htbp]
     \centering
-    \includegraphics[width=\textwidth]{figures/appendix_figureA1_kmeans_wss_vs_k_cleaned.pdf}
+    \includegraphics[width=\textwidth]{figures/appendix_figureA1_kmeans_wss_vs_k_cleaned.png}
     \caption{Within-cluster sum of squares for MacQueen K-means across candidate cluster counts. The elbow diagnostic selects 4 clusters in all three embedding dimensions.}
     \label{fig:kmeans-wss-appendix}
 \end{figure}
@@ -46,14 +46,14 @@ knitr::kable(
 
 \begin{figure}[htbp]
     \centering
-    \includegraphics[width=\textwidth]{figures/appendix_figureA2_rkm_silhouette_vs_k_nf.pdf}
+    \includegraphics[width=\textwidth]{figures/appendix_figureA2_rkm_silhouette_vs_k_nf.png}
     \caption{Reduced K-means silhouette values across candidate cluster counts and retained-factor settings. The strongest region lies at 2 clusters.}
     \label{fig:rkm-grid-appendix}
 \end{figure}
 
 \begin{figure}[htbp]
     \centering
-    \includegraphics[width=\textwidth]{figures/appendix_figureA3_probability_silhouette_pd_fpdc.pdf}
+    \includegraphics[width=\textwidth]{figures/appendix_figureA3_probability_silhouette_pd_fpdc.png}
     \caption{Best probability silhouette across candidate cluster counts for PD clustering and FPDC. FPDC improves the soft-membership diagnostic relative to PD, but it still does not produce a strong hard partition.}
     \label{fig:prob-silhouette-appendix}
 \end{figure}
