@@ -23,30 +23,23 @@ Clustering is not performed directly on the raw sparse rating matrix. Instead, t
 
 ## Clustering Implementation in R
 
-All four clustering analyses were conducted in R. User-embedding matrices derived from the MovieLens data were standardized
-prior to clustering so that all dimensions contributed comparably to distance-based
-calculations. Intermediate results for each method and parameter combination were
-cached to `.rds` files to avoid redundant computation across runs.
+We ran all four clustering analyses in R. Before clustering, we standardized every embedding matrix so that each embedding coordinate contributed on a comparable scale to Euclidean-distance calculations. We cached every fitted model and tuning result to `.rds` files so that we could reproduce tables and figures without rerunning the full pipeline during rendering.
 
-We implemented K-means clustering [@everitt2011cluster] using the `kmeans()` function from the base R stats` package. For each embedding dimension, we evaluated candidate cluster counts over $k \in \{2, \ldots, 20\}$. During tuning, we compared the Hartigan--Wong, Lloyd, and MacQueen algorithmic variants using 10 random starts and a maximum of 100 iterations. Across all embedding dimensions, all three variants selected $k=2$ according to both average silhouette width and the Calinski--Harabasz index, with only small differences in the resulting metric values. We selected MacQueen as the final K-means variant for reporting and for cross-method comparisons because it provided the best overall balance of clustering quality, runtime, and numerical robustness. Final K-means models were then fit using the MacQueen algorithm with 100 random starts and a maximum of 100 iterations. For tuning, we considered $k \in \{2, \ldots, 20\}$, nd for cross-method comparisons we evaluated fixed values of $k$ over $ \{2, \ldots, 10\}$.
+We implemented K-means [@everitt2011cluster] with the `kmeans()` function from the base `stats` package. During tuning, we compared the Hartigan--Wong, Lloyd, and MacQueen algorithmic variants with 10 random starts and a maximum of 100 iterations. The three variants led to the same substantive tuning conclusion: in every embedding dimension, they attained their best silhouette and Calinski-Harabasz values at 2 clusters, and the metric differences between variants were small. We selected MacQueen as the final reported K-means implementation because it provided the strongest overall runtime--quality tradeoff and the cleanest fitting behavior across embeddings. For K-means tuning, we evaluated cluster counts from 2 through 20 so that we could inspect the full within-cluster sum of squares curve. For the cross-method comparison, we used the saved MacQueen models over cluster counts 2 through 8.
 
-Reduced k-means [@desoete1994rkm] was implemented using `cluspca()` from the `clustrd`
-package [@vichi2001fkm], with `method = "RKM"` and `rotation = "varimax"`. Models
-were fit over the grid $k \in \{2, \ldots, 10\}$ and $q \in \{2, \ldots, 6\}$, where
-$q$ denotes the number of retained dimensions in the reduced subspace. For each
-$(k, q)$ combination, results were cached and the best model per embedding was
-selected using silhouette as the primary criterion and CH as a tiebreaker.
+We implemented Reduced K-means [@desoete1994rkm] with `cluspca()` from the `clustrd` package, [@vichi2001fkm] using `method = "RKM"` and `rotation = "varimax"`. We jointly tuned the number of clusters $(k \in \{2, \ldots, 10\})$ and the number of retained factors over a grid of 2 through 10 clusters and 2 through 6 retained factors $(q \in \{2, \ldots, 6\})$. Reduced K-means estimates both a partition and a lower-dimensional subspace, so each additional retained factor increases computational cost. We selected the final Reduced K-means model in each embedding with average silhouette width as the primary criterion and the Calinski-Harabasz index as the secondary criterion for each $(k, q)$ combination.
 
-PD clustering [@benisrael2008pdclustering] was implemented using `PDC()` from the
-`FPDclustering` package [@tortora2024fpdclustering]. Models were fit over
-$k \in \{2, \ldots, 5\}$ using Euclidean distance. Hard cluster assignments were
-obtained by assigning each observation to its highest-probability cluster. The best
-model per embedding was selected using average silhouette width as the primary
-criterion.
+
+We implemented PD clustering [@benisrael2008pdclustering] with `PDC()` from the
+`FPDclustering` package [@tortora2024fpdclustering]. For each embedding dimension, we evaluated candidate cluster counts from 2 through 20. PD clustering does not estimate an additional reduced subspace, so it remained computationally inexpensive relative to Reduced K-means and FPDC and therefore supported a broader cluster-count search. We selected the final PD model in each embedding with probability silhouette as the primary criterion, ordinary silhouette as the secondary criterion, and the Calinski-Harabasz index as the tertiary criterion.
 
 FPDC [@tortora2016fpdc] was implemented using `FPDC()` from the `FPDclustering`
 package [@tortora2024fpdclustering]. Models were fit over the grid
 $k \in \{2, \ldots, 8\}$ and $q \in \{2, \ldots, 5\}$, using 20 internal iterations
-and a tuning parameter fixed at $\nu = 10$, i.e.,
-`FPDC(embedding_matrix, k, 20, q, nu = 10)`. The best model per embedding was
-selected using silhouette as the primary criterion and CH as a tiebreaker.
+and a tuning parameter fixed at $\nu = 10$ and $\nu=6$. For example one run would be
+`FPDC(embedding_matrix, k=2, q=2, \nu = 10)`. Preliminary FPDC runs with $\nu=2$ produced highly inconsistent solutions and did not improve either probability silhouette or ordinary silhouette beyond chance-like behavior, so we excluded $\nu=2$ from the final reported sensitivity summary. We still report that $\nu=2$ was tested, but we focus the final FPDC comparison on $\nu=6$ and $\nu=10$. We selected the best model per embedding was probability silhouette as the primary criterion, ordinary silhouette as the secondary criterion, and the Calinski-Harabasz index as the tertiary criterion.
+
+The methods used different tuning grids because they optimize different objectives and incur different computational costs. K-means only tunes the number of clusters, so we could afford a broader cluster-count range and inspect a full elbow curve. Reduced K-means and FPDC tune both cluster counts and retained factors, so each added retained factor expands the search space. FPDC also tunes $\nu$ and updates soft memberships, which makes it the most computationally demanding method in the comparison.
+
+
+

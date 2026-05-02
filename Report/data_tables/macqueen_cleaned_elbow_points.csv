@@ -1,0 +1,4 @@
+"embedding","embedding_dim","embedding_label","elbow_k","WSS"
+"user_embeddings_128",128,"128-dimensional",4,739469.398913772
+"user_embeddings_256",256,"256-dimensional",4,1490587.63805867
+"user_embeddings_64",64,"64-dimensional",4,368727.17887242
