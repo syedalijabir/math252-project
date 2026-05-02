@@ -8,7 +8,7 @@ To generate user embeddings, we first constructed a user--item interaction matri
 
 We then used a fully connected neural network (Multi-Layer Perceptron, MLP) to project the high-dimensional user vectors into a lower-dimensional latent space. The network takes a 3706-dimensional input vector and passes it through a hidden layer of size 512, followed by a non-linear activation (Sigmoid). A second linear layer maps this representation to a compact embedding space. We experimented with multiple embedding sizes of 64, 128, and 256 to study the effect of representation capacity.
 
-Figure \ref{fig:mlp_architecture} illustrates the architecture of the network used for embedding generation.
+Figure \@ref{fig:mlp_architecture} illustrates the architecture of the network used for embedding generation.
 
 \begin{figure}[h]
     \centering

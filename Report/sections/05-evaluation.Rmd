@@ -38,28 +38,30 @@ common scale.
 
 ### Implementation Summary
 
-All methods were applied to standardized embedding matrices of dimensions 64, 128, and 256. For K-means, WSS elbow plots were used as a method-specific tuning diagnostic, and the final value of $k$ was determined using silhouette width, the Calinski--Harabasz index, and bootstrap stability when the elbow was weak or ambiguous. For Reduced K-means, $k$ and the reduced dimension $q$ were selected jointly over a two-dimensional grid using silhouette as the primary criterion and CH as a secondary check. For the probabilistic methods, model selection emphasized probability silhouette because PD clustering and FPDC produce soft cluster memberships. Accordingly, PD models were selected over $k$ using probability silhouette as the primary criterion, with ordinary silhouette and CH used as supporting diagnostics, while FPDC models were selected over $(k,q,ν)$using the same hierarchy. Intermediate results were cached to R Data Serialization ( `.rds` ) files to support reproducibility without rerunning the full pipeline during rendering. The tuning ranges and selection criteria for each method are summarized in Table \@ref(tab:tuning-summary).
 
+```{r tbl-tuning-summary, echo=FALSE}
+#| tbl-cap: "Tuning ranges and model-selection criteria for each clustering method."
 
-```{r tuning-summary, echo=FALSE}
 library(dplyr)
 library(tibble)
 library(knitr)
-library(kableExtra)
 
 tuning_summary <- tribble(
-  ~Method,               ~`k range`, ~`q range`, ~`nu range`, ~`Primary criterion`,                 ~`Secondary criterion`,      ~`Tertiary criterion`,
-  "K-means",             "2-20",     "N/A",      "N/A",       "WSS elbow diagnostic",              "Silhouette",                "CH, bootstrap stability",
-  "Reduced K-means",     "2-10",     "2-6",      "N/A",       "Silhouette over (k, q)",           "CH",                        "Bootstrap stability",
-  "PD clustering",       "2-5",      "N/A",      "N/A",       "Probability silhouette",           "Silhouette",                "CH",
-  "FPDC",                "2-8",      "2-5",      "2, 6, 10",  "Probability silhouette over (k,q,nu)", "Silhouette, CH",       "Bootstrap stability"
+  ~Method,               ~`k range`, ~`q range`, ~`nu range`, ~`Primary criterion`, ~`Secondary criterion`, ~`Tertiary criterion`,
+  "K-means",             "2-20",     "N/A",      "N/A",       "WSS elbow diagnostic", "Silhouette",           "CH, bootstrap stability",
+  "Reduced K-means",     "2-10",     "2-6",      "N/A",       "Silhouette over (k, q)", "CH",                 "Bootstrap stability",
+  "PD clustering",       "2-5",      "N/A",      "N/A",       "Probability silhouette", "Silhouette",         "CH",
+  "FPDC",                "2-8",      "2-5",      "2, 6, 10",  "Probability silhouette over (k, q, nu)", "Silhouette, CH", "Bootstrap stability"
 )
 
-kable(
+knitr::kable(
   tuning_summary,
-  booktabs = TRUE,
-  caption = "Tuning ranges and model-selection criteria for each clustering method."
-) |>
-  kable_styling(latex_options = c("hold_position", "striped"), full_width = FALSE)
+  booktabs = TRUE
+)
 ```
+
+All methods were applied to standardized embedding matrices of dimensions 64, 128, and 256. For K-means, WSS elbow plots were used as a method-specific tuning diagnostic, and the final value of $k$ was determined using silhouette width, the Calinski--Harabasz index, and bootstrap stability when the elbow was weak or ambiguous. For Reduced K-means, $k$ and the reduced dimension $q$ were selected jointly over a two-dimensional grid using silhouette as the primary criterion and CH as a secondary check. For the probabilistic methods, model selection emphasized probability silhouette because PD clustering and FPDC produce soft cluster memberships. Accordingly, PD models were selected over $k$ using probability silhouette as the primary criterion, with ordinary silhouette and CH used as supporting diagnostics, while FPDC models were selected over $(k, q, \nu)$ using the same hierarchy. Intermediate results were cached to R Data Serialization or `.rds` files to support reproducibility without rerunning the full pipeline during rendering. The tuning ranges and selection criteria for each method are summarized in Table \@ref(tab:tbl-tuning-summary).
+
+
+
 

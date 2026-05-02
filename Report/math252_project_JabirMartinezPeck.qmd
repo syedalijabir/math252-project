@@ -40,6 +40,7 @@ library(ggplot2)
 library(knitr)
 library(scales)
 
+
 source("compare_results_helpers.R")
 
 compare_results <- build_compare_results_data(
