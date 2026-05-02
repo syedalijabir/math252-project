@@ -6,6 +6,10 @@ Although this study is motivated by data commonly used in recommender systems, i
 
 The MovieLens datasets are widely used benchmarks in machine learning and recommender-systems research because they contain rich user-movie rating information. In this project, we report results for the MovieLens 1M dataset. We also constructed two supplementary MovieLens 20M-based user subsets for planned robustness checks, but those analyses are not reported because of computational constraints. We consider embedding dimensions of 64, 128, and 256 and compare four clustering methods: k-means, probabilistic distance (PD) clustering, reduced k-means, and factorial probabilistic distance clustering (FPDC). The goal is to evaluate how embedding dimension and clustering method jointly affect the quality, stability, and interpretability of clustering solutions.
 
+Overall, the results provide only modest evidence of clustering structure in the learned embeddings. Among the methods considered, Reduced K-means consistently produced the strongest hard-clustering results, particularly in the 128-dimensional embedding space, while K-means recovered a similar underlying structure but was sensitive to the choice of tuning criterion. In contrast, the probabilistic methods (PD clustering and FPDC) did not produce stable or well-separated partitions under the evaluation framework used in this study. Across methods, the 128-dimensional embeddings yielded the clearest structure, suggesting a balance between under- and over-compression of user preferences.
+
+These findings suggest that while embedding-based representations of user behavior may contain some cluster tendency, the resulting structure is weak and sensitive to modeling choices, and does not support strong claims of clearly separated user groups.
+
 This report is organized as follows. 
 [Section II](#background) reviews the clustering methods used in the study. 
 [Section III](#dataset) describes the dataset and preprocessing pipeline. 
