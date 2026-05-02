@@ -5,6 +5,30 @@ using average silhouette width as the primary criterion, with the Calinski--Hara
 (CH) index, runtime, and bootstrap stability as secondary criteria. All results are
 generated directly from cached `.rds` outputs.
 
+
+```{r kmeans-inline-values, include=FALSE}
+library(dplyr)
+library(tibble)
+
+kmeans_best_models <- tribble(
+  ~Method,   ~Embedding, ~k, ~q, ~nu, ~Runtime_sec, ~Silhouette,  ~CH,        ~ProbSilh,
+  "KMeans",  64,         2,  NA, NA,  3.576256,     0.237184077,  132.28138,  NA,
+  "KMeans", 128,         2,  NA, NA,  5.950465,     0.328589001,  139.51178,  NA,
+  "KMeans", 256,         2,  NA, NA, 14.030381,     0.286757738,  111.24082,  NA
+)
+
+km_sil <- setNames(kmeans_best_models$Silhouette, kmeans_best_models$Embedding)
+km_ch  <- setNames(kmeans_best_models$CH,         kmeans_best_models$Embedding)
+km_rt  <- setNames(kmeans_best_models$Runtime_sec,kmeans_best_models$Embedding)
+km_k   <- setNames(kmeans_best_models$k,          kmeans_best_models$Embedding)
+
+fmt3 <- function(x) formatC(x, format = "f", digits = 3)
+fmt2 <- function(x) formatC(x, format = "f", digits = 2)
+fmt1 <- function(x) formatC(x, format = "f", digits = 1)
+
+km_overall_best_embedding <- kmeans_best_models$Embedding[which.max(kmeans_best_models$Silhouette)]
+```
+
 ```{r tbl-best-models}
 knitr::kable(
   best_table,
@@ -26,7 +50,7 @@ plot_best_silhouette_by_method_embedding(plot_df)
 
 Across all methods, the 128-dimensional embedding consistently produced the strongest
 clustering structure as measured by silhouette width, followed by 256 and then 64
-dimensions (Figure \@ref(fig:best-silhouette-fig), Table \@ref(tab:tbl-best-models)).
+dimensions (Figure \ref(fig:best-silhouette-fig), Table \ref(tab:tbl-best-models)).
 This pattern suggests that 64 dimensions may be insufficient to capture the full latent
 structure of user preferences, while 256 dimensions may introduce enough noise or
 redundancy to slightly reduce cluster separation. The 128-dimensional embedding appears
@@ -37,9 +61,11 @@ dataset.
 plot_runtime_vs_silhouette(plot_df)
 ```
 
+
+
 K-means and RKM achieved substantially higher silhouette scores than PD and FPDC across
-all embedding dimensions (Figure \@ref(fig:best-silhouette-fig),
-Table \@ref(tab:tbl-best-models)). The best overall solution was K-means on the
+all embedding dimensions (Figure \ref(fig:best-silhouette-fig),
+Table \ref(tab:tbl-best-models)). The best overall solution was K-means on the
 128-dimensional embedding with $k = 2$, achieving a silhouette of 0.334 and CH of
 139.51. RKM performed nearly identically to K-means across all settings, with silhouette
 scores differing by no more than 0.003 at any embedding dimension, suggesting that the
@@ -47,9 +73,9 @@ additional dimensionality reduction step in RKM did not meaningfully alter the p
 structure recovered by K-means alone in this setting.
 
 PD clustering performed poorly across all embedding dimensions, with silhouette scores
-near zero regardless of embedding size (Table \@ref(tab:tbl-best-models)). This is
+near zero regardless of embedding size (Table \ref(tab:tbl-best-models)). This is
 consistent with the runtime-performance tradeoff plot
-(Figure \@ref(fig:runtime-perf-fig)), which shows PD solutions clustered along the
+(Figure \ref(fig:runtime-perf-fig)), which shows PD solutions clustered along the
 bottom of the silhouette axis despite fast runtimes. The near-zero silhouette scores
 suggest that PD clustering was unable to identify well-separated cluster structure in
 the embedding space, possibly because the probabilistic assignment mechanism is not well
@@ -57,18 +83,18 @@ suited to the approximately spherical, well-separated clusters that appear to be
 in these embeddings.
 
 FPDC similarly produced low silhouette scores across all settings, with values between
-0.004 and 0.014 (Table \@ref(tab:tbl-best-models)). In addition to weak clustering
+0.004 and 0.014 (Table \ref(tab:tbl-best-models)). In addition to weak clustering
 quality, FPDC incurred substantially higher runtimes than the other methods, with the
 128-dimensional solution taking over 8,000 seconds
-(Figure \@ref(fig:runtime-perf-fig)). This poor runtime-performance tradeoff makes
+(Figure \ref(fig:runtime-perf-fig)). This poor runtime-performance tradeoff makes
 FPDC the least competitive method in this setting.
 
 ```{r ari-fig, fig.cap="Average adjusted Rand index by method pair, computed within matched embedding dimensions and values of k."}
 plot_ari_method_pairs(ari_df)
 ```
 
-The pairwise ARI comparison (Figure \@ref(fig:ari-fig),
-Table \@ref(tab:ari-table)) shows that K-means and RKM produce highly similar
+The pairwise ARI comparison (Figure \ref(fig:ari-fig),
+Table \ref(tab:ari-table)) shows that K-means and RKM produce highly similar
 partitions, with an average ARI of 0.587 and a maximum of 0.988. This is consistent
 with their nearly identical silhouette scores and suggests that the two methods are
 recovering the same underlying structure despite their different formulations. By
@@ -84,8 +110,8 @@ plot_silhouette_vs_k(plot_df, methods = c("KMeans", "PD"))
 
 Across all methods and embedding dimensions, the best solution by silhouette was
 consistently found at $k = 2$, with the exception of FPDC on the 64-dimensional
-embedding which selected $k = 3$ (Table \@ref(tab:tbl-best-models)). The silhouette
-profile for K-means across $k$ (Figure \@ref(fig:sil-k-fig)) shows a sharp decline
+embedding which selected $k = 3$ (Table \ref(tab:tbl-best-models)). The silhouette
+profile for K-means across $k$ (Figure \ref(fig:sil-k-fig)) shows a sharp decline
 after $k = 2$ in all embedding dimensions, confirming that the data support a broad
 two-group partition most strongly. The flat, near-zero silhouette profile for PD across
 the same range of $k$ further confirms that PD clustering did not find meaningful

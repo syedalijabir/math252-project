@@ -19,7 +19,8 @@ additionally computed using `Silh()` from the `FPDclustering` package
 weights and is better suited to evaluating solutions where observations belong
 partially to multiple clusters. For k-means only, **total within-cluster sum of squares
 (WSS)** is also reported as it directly reflects the k-means objective and is used in
-the elbow method for cluster count selection.
+the elbow method for cluster count selection. Because WSS decreases monotonically with $k$, the elbow plot was treated as a method-specific diagnostic rather than a standalone decision rule; when the elbow was weak or ambiguous, silhouette width, the Calinski--Harabasz index, and bootstrap stability were used to finalize the selected value of $k$.
+
 
 ### Stability
 
@@ -37,20 +38,28 @@ common scale.
 
 ### Implementation Summary
 
-All methods were applied to standardized embedding matrices of dimensions 64, 128, and
-256. For each method, the number of clusters $k$ was selected primarily using the
-highest average silhouette width, with the CH index used as a secondary criterion where
-silhouette scores were tied or ambiguous. Where relevant, the reduced dimension $q$ was
-selected jointly with $k$ over a two-dimensional grid. Intermediate results were cached
-to `.rds` files to support reproducibility without rerunning the full pipeline during
-rendering. The tuning ranges and selection criteria for each method are summarized in
-Table X.
+All methods were applied to standardized embedding matrices of dimensions 64, 128, and 256. For K-means, WSS elbow plots were used as a method-specific tuning diagnostic, and the final value of $k$ was determined using silhouette width, the Calinski--Harabasz index, and bootstrap stability when the elbow was weak or ambiguous. For Reduced K-means, $k$ and the reduced dimension $q$ were selected jointly over a two-dimensional grid using silhouette as the primary criterion and CH as a secondary check. For the probabilistic methods, model selection emphasized probability silhouette because PD clustering and FPDC produce soft cluster memberships. Accordingly, PD models were selected over $k$ using probability silhouette as the primary criterion, with ordinary silhouette and CH used as supporting diagnostics, while FPDC models were selected over $(k,q,ν)$using the same hierarchy. Intermediate results were cached to R Data Serialization ( `.rds` ) files to support reproducibility without rerunning the full pipeline during rendering. The tuning ranges and selection criteria for each method are summarized in Table \@ref(tab:tuning-summary).
 
-| Method | $k$ range | $q$ range | Primary criterion | Secondary criterion |
-|--------|-----------|-----------|-------------------|---------------------|
-| K-Means | $2, \ldots, 20$ | --- | Silhouette | CH, WSS |
-| Reduced K-Means | $2, \ldots, 10$ | $2, \ldots, 6$ | Silhouette | CH |
-| PD Clustering | $2, \ldots, 5$ | --- | Silhouette | CH, prob. silhouette |
-| FPDC | $2, \ldots, 8$ | $2, \ldots, 5$ | Silhouette | CH, prob. silhouette |
 
-Table: Tuning ranges and model selection criteria for each clustering method.
+```{r tuning-summary, echo=FALSE}
+library(dplyr)
+library(tibble)
+library(knitr)
+library(kableExtra)
+
+tuning_summary <- tribble(
+  ~Method,               ~`k range`, ~`q range`, ~`nu range`, ~`Primary criterion`,                 ~`Secondary criterion`,      ~`Tertiary criterion`,
+  "K-means",             "2-20",     "N/A",      "N/A",       "WSS elbow diagnostic",              "Silhouette",                "CH, bootstrap stability",
+  "Reduced K-means",     "2-10",     "2-6",      "N/A",       "Silhouette over (k, q)",           "CH",                        "Bootstrap stability",
+  "PD clustering",       "2-5",      "N/A",      "N/A",       "Probability silhouette",           "Silhouette",                "CH",
+  "FPDC",                "2-8",      "2-5",      "2, 6, 10",  "Probability silhouette over (k,q,nu)", "Silhouette, CH",       "Bootstrap stability"
+)
+
+kable(
+  tuning_summary,
+  booktabs = TRUE,
+  caption = "Tuning ranges and model-selection criteria for each clustering method."
+) |>
+  kable_styling(latex_options = c("hold_position", "striped"), full_width = FALSE)
+```
+
