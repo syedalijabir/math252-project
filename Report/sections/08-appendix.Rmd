@@ -1,14 +1,6 @@
 # Appendix
 
-You can see our entire code at our GitHub repository.
-
-[WE SHOULD CITE THE PAPERS WE READ ABOUT THE DIFFERENT CLUSTERING METHODS!]
-
-#`Report/sections/08-appendix.Rmd`
-
-
-
-This appendix collects supporting diagnostics that informed model selection but were too detailed for the main results section.
+The code used to reproduce all analyses, figures, and tables in this report is available at: \url{https://github.com/syedalijabir/math252-project}
 
 ## Additional tuning diagnostics
 
