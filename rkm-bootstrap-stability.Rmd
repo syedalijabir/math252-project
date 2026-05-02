@@ -137,7 +137,7 @@ load_best_cached_rkm_for_k <- function(embedding_tag, k_val, q_vals = 2:6,
   for (q_val in q_vals) {
     cache_file <- file.path(
       cache_dir,
-      paste0("rkm_", embedding_tag, "_k", k_val, "_q", q_val, ".rds")
+      paste0("rkm_", embedding_tag, "_k", k_val, "_nf", q_val, ".rds")
     )
 
     if (!file.exists(cache_file)) next
@@ -400,7 +400,7 @@ write.csv(
 ```{r plot-bootstrap-stability}
 # Line plot of mean bootstrap ARI by k, faceted by embedding.
 # Higher ARI = partitions on subsamples closely match the full-data partition.
-ggplot(bootstrap_results_df, aes(x = k, y = rkm_bootstrap_ari_mean)) +
+prkm <- ggplot(bootstrap_results_df, aes(x = k, y = rkm_bootstrap_ari_mean)) +
   geom_line(linewidth = 1, color = "steelblue") +
   geom_point(size = 2,    color = "steelblue") +
   geom_errorbar(
@@ -417,6 +417,14 @@ ggplot(bootstrap_results_df, aes(x = k, y = rkm_bootstrap_ari_mean)) +
     x     = "Number of clusters (k)",
     y     = "Mean bootstrap ARI (± 1 SD)"
   )
+
+prkm
+
+ggsave("figures/prkm_bootstrap_stability.png",
+       plot = prkm,
+       width = 8,
+       height = 6,
+       dpi = 300)
 ```
 
 # 7. Inspect one cached bootstrap result

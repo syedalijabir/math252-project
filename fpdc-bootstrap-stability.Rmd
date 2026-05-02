@@ -3,7 +3,8 @@ title: "MovieLens 1M: Bootstrap Stability for FPDC"
 author: ""
 date: "`r format(Sys.Date())`"
 output:
-  pdf_document: default
+  pdf_document:
+    latex_engine: xelatex
 fontsize: 11pt
 geometry: margin=1in
 ---
@@ -388,7 +389,7 @@ write.csv(
 ```{r plot-bootstrap-stability}
 # Line plot of mean bootstrap ARI by k, faceted by embedding.
 # Higher ARI = partitions on subsamples closely match the full-data partition.
-ggplot(bootstrap_results_df, aes(x = k, y = fpdc_bootstrap_ari_mean)) +
+pd <- ggplot(bootstrap_results_df, aes(x = k, y = fpdc_bootstrap_ari_mean)) +
   geom_line(linewidth = 1, color = "steelblue") +
   geom_point(size = 2,    color = "steelblue") +
   geom_errorbar(
@@ -405,6 +406,12 @@ ggplot(bootstrap_results_df, aes(x = k, y = fpdc_bootstrap_ari_mean)) +
     x     = "Number of clusters (k)",
     y     = "Mean bootstrap ARI (± 1 SD)"
   )
+pd
+ggsave("figures/fpdc_bootstrap_stability.png",
+       plot = pd,
+       width = 8,
+       height = 6,
+       dpi = 300)
 ```
 
 # 7. Inspect one cached bootstrap result

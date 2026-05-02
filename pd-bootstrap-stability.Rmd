@@ -347,7 +347,7 @@ write.csv(
 ```{r plot-bootstrap-stability}
 # Line plot of mean bootstrap ARI by k, faceted by embedding.
 # Higher ARI = partitions on subsamples closely match the full-data partition.
-ggplot(bootstrap_results_df, aes(x = k, y = pd_bootstrap_ari_mean)) +
+p <- ggplot(bootstrap_results_df, aes(x = k, y = pd_bootstrap_ari_mean)) +
   geom_line(linewidth = 1, color = "steelblue") +
   geom_point(size = 2,    color = "steelblue") +
   geom_errorbar(
@@ -364,6 +364,14 @@ ggplot(bootstrap_results_df, aes(x = k, y = pd_bootstrap_ari_mean)) +
     x     = "Number of clusters (k)",
     y     = "Mean bootstrap ARI (± 1 SD)"
   )
+p
+
+ggsave("figures/pd_bootstrap_stability.png",
+       plot = p,
+       width = 8,
+       height = 6,
+       dpi = 300)
+
 ```
 
 # 7. Inspect one cached bootstrap result
