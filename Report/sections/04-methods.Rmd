@@ -28,14 +28,7 @@ prior to clustering so that all dimensions contributed comparably to distance-ba
 calculations. Intermediate results for each method and parameter combination were
 cached to `.rds` files to avoid redundant computation across runs.
 
-K-means clustering [@everitt2011cluster] was implemented using the `kmeans()` function
-from the base R `stats` package. Candidate cluster counts were evaluated over
-$k \in \{2, \ldots, 20\}$. During tuning, three algorithmic variants were compared
-(Hartigan--Wong, Lloyd, and MacQueen) with `nstart = 10` and `iter.max = 100`. The
-final model was refit using `nstart = 100` and `iter.max = 100` with the
-Hartigan--Wong algorithm. For cross-method comparison, k-means was also run for fixed
-values $k \in \{3, \ldots, 10\}$ using the MacQueen algorithm with `nstart = 100` and
-`iter.max = 100`.
+We implemented K-means clustering [@everitt2011cluster] using the `kmeans()` function from the base R stats` package. For each embedding dimension, we evaluated candidate cluster counts over $k \in \{2, \ldots, 20\}$. During tuning, we compared the Hartigan--Wong, Lloyd, and MacQueen algorithmic variants using 10 random starts and a maximum of 100 iterations. Across all embedding dimensions, all three variants selected $k=2$ according to both average silhouette width and the Calinski--Harabasz index, with only small differences in the resulting metric values. We selected MacQueen as the final K-means variant for reporting and for cross-method comparisons because it provided the best overall balance of clustering quality, runtime, and numerical robustness. Final K-means models were then fit using the MacQueen algorithm with 100 random starts and a maximum of 100 iterations. For tuning, we considered $k \in \{2, \ldots, 20\}$, nd for cross-method comparisons we evaluated fixed values of $k$ over $ \{2, \ldots, 10\}$.
 
 Reduced k-means [@desoete1994rkm] was implemented using `cluspca()` from the `clustrd`
 package [@vichi2001fkm], with `method = "RKM"` and `rotation = "varimax"`. Models
