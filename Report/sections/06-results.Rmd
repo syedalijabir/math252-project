@@ -1,4 +1,4 @@
-# Results
+# Results {#sec-results}
 
 This section compares clustering performance across embedding dimensions and methods
 using average silhouette width as the primary criterion, with the Calinski-Harabasz
@@ -15,16 +15,16 @@ generated directly from cached `.rds` outputs.
 Method & Embedding & Clusters & Factors & $\nu$ & Runtime & Silhouette & CH index & Prob.\ silh. \\
 \midrule
 K-means & 64  & 4 & --- & --- & 7.35  & -0.011 & 96.96  & --- \\
-PD clustering & 64  & 2 & --- & --- & 0.29  & 0.003  & 10.14  & 0.093 \\
-Reduced K-means & 64  & 2 & 2 & --- & 278.90 & 0.235 & 132.29 & --- \\
+PD & 64  & 2 & --- & --- & 0.29  & 0.003  & 10.14  & 0.093 \\
+RKM & 64  & 2 & 2 & --- & 278.90 & 0.235 & 132.29 & --- \\
 FPDC & 64  & 2 & 4 & 6  & 241.74 & 0.012 & 70.55  & 0.143 \\
 K-means & 128 & 4 & --- & --- & 12.72 & -0.010 & 91.21  & --- \\
-PD clustering & 128 & 2 & --- & --- & 0.18  & 0.000  & 0.92   & 0.068 \\
-Reduced K-means & 128 & 2 & 4 & --- & 184.10 & 0.331 & 139.52 & --- \\
+PD & 128 & 2 & --- & --- & 0.18  & 0.000  & 0.92   & 0.068 \\
+RKM & 128 & 2 & 4 & --- & 184.10 & 0.331 & 139.52 & --- \\
 FPDC & 128 & 4 & 2 & 6  & 188.16 & -0.115 & 56.43 & 0.136 \\
 K-means & 256 & 4 & --- & --- & 23.45 & 0.026  & 74.77  & --- \\
-PD clustering & 256 & 2 & --- & --- & 0.26  & 0.000  & 1.07   & 0.062 \\
-Reduced K-means & 256 & 2 & 5 & --- & 257.64 & 0.290 & 111.25 & --- \\
+PD & 256 & 2 & --- & --- & 0.26  & 0.000  & 1.07   & 0.062 \\
+RKM & 256 & 2 & 5 & --- & 257.64 & 0.290 & 111.25 & --- \\
 FPDC & 256 & 6 & 3 & 10 & 70.74 & -0.209 & 33.92 & 0.148 \\
 \bottomrule
 \end{tabular}
@@ -32,12 +32,12 @@ FPDC & 256 & 6 & 3 & 10 & 70.74 & -0.209 & 33.92 & 0.148 \\
 
 Table \ref{tab:best-models} reports the final selected model for each method and
 embedding dimension under the pre-specified method-specific tuning rules. Under these
-rules, Reduced K-means produced the strongest overall hard partitions. The best overall
+rules, RKM produced the strongest overall hard partitions. The best overall
 solution used the 128-dimensional embeddings, 2 clusters, and 4 retained factors, and
 it achieved an average silhouette width of 0.331 and a Calinski-Harabasz index of
-139.52. The 256-dimensional Reduced K-means model followed with 2 clusters and 5
+139.52. The 256-dimensional RKM model followed with 2 clusters and 5
 retained factors, silhouette 0.290, and Calinski-Harabasz index 111.25. The
-64-dimensional Reduced K-means model selected 2 clusters and 2 retained factors and
+64-dimensional RKM model selected 2 clusters and 2 retained factors and
 achieved silhouette 0.235 and Calinski-Harabasz index 132.29.
 
 K-means behaved differently under the revised selection rules because we prioritized

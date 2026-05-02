@@ -1,4 +1,4 @@
-# Appendix
+# Appendix {#sec-appendix}
 
 The code used to reproduce all analyses, figures, and tables in this report is available at: \url{https://github.com/syedalijabir/math252-project}
 
@@ -106,10 +106,6 @@ Embedding dimension & \(\nu\) & Clusters & Retained factors & Runtime (s) & Aver
 \end{tabular}
 }
 \end{table}
-
-
-
-The full project code and supporting scripts are available in the GitHub repository. In the final version of the report, this appendix should also include the citations for the clustering methods and any supplementary implementation details that are too technical for the main text.
 ```
 
 
