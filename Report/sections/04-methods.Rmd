@@ -19,14 +19,6 @@ Figure \ref{fig:mlp_architecture} illustrates the architecture of the network us
 
 After the embeddings are learned, clustering is performed separately in each embedding space. The four clustering methods considered are k-means, PD clustering, reduced k-means, and FPDC. The experimental design applies each method to each embedding dimension in order to compare clustering behavior across both representation size and clustering algorithm.
 
-The number of clusters considered, the procedure used to select that value, the initialization strategy, stopping criteria, and the number of repeated runs should all be stated explicitly in the final version. These choices affect both clustering quality and computational cost.
-
-[ADD NUMBER OF CLUSTERS CONSIDERED.]
-
-[ADD CLUSTER-SELECTION PROCEDURE.]
-
-[ADD INITIALIZATION STRATEGIES, STOPPING CRITERIA, AND NUMBER OF REPEATED RUNS.]
-
 Clustering is not performed directly on the raw sparse rating matrix. Instead, the embedding model transforms sparse user--item behavior into a lower-dimensional representation on which clustering is applied.
 
 ## Clustering Implementation in R
