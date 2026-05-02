@@ -1,24 +1,20 @@
 # Background {#sec-background}
 
-Clustering partitions observations into groups according to a notion of similarity or distance. In this study, clustering is performed in learned embedding spaces, so the geometry of the representation plays a central role in determining cluster quality.
-
-We consider four partition-based methods that differ along two key dimensions: (i) **hard vs. probabilistic assignment**, and (ii) **clustering in the full space vs. a learned lower-dimensional subspace**.
+Clustering partitions observations into groups according to a notion of similarity or distance. In this study, clustering is performed in learned embedding spaces, so the geometry of the representation plays a central role in determining cluster quality. We consider four partition-based methods that differ along two key dimensions, hard vs. probabilistic assignment, and clustering in the full space vs. a learned lower-dimensional subspace.
 
 **K-means** provides a natural baseline. It assigns each observation to a single cluster by minimizing within-cluster variation, and is computationally efficient and widely used. However, it implicitly favors roughly spherical, equally sized clusters and can be sensitive to initialization, scaling, and outliers.
 
 **Probabilistic distance clustering (PD)** replaces hard assignments with probabilistic memberships determined by distances to cluster centers. This produces a soft partition in which observations can belong to multiple clusters to varying degrees. As a result, PD is typically more robust to overlap and noise, but at increased computational cost relative to K-means.
 
-High-dimensional settings motivate methods that jointly perform clustering and dimension reduction. In such cases, cluster structure may be more clearly expressed in a lower-dimensional subspace than in the original feature space.
-
-**Reduced K-means (RKM)** extends K-means by simultaneously estimating a low-dimensional projection and a partition within that subspace. By concentrating on directions that are most relevant for clustering, it can recover structure that is obscured in the full space, while retaining the simplicity of hard assignments.
+High-dimensional settings motivate methods that jointly perform clustering and dimension reduction. In such cases, cluster structure may be more clearly expressed in a lower-dimensional subspace than in the original feature space. **Reduced K-means (RKM)** extends K-means by simultaneously estimating a low-dimensional projection and a partition within that subspace. By concentrating on directions that are most relevant for clustering, it can recover structure that is obscured in the full space, while retaining the simplicity of hard assignments.
 
 **Factorial probabilistic distance clustering (FPDC)** combines the ideas of PD and dimension reduction. It estimates a latent subspace together with probabilistic cluster memberships, effectively performing soft clustering in a learned representation. This allows FPDC to accommodate overlapping clusters while also mitigating the effects of high dimensionality.
 
 From this perspective, the four methods can be viewed along two orthogonal axes: assignment (hard vs. probabilistic) and representation (original space vs. learned subspace). These differences suggest potential trade-offs in robustness, interpretability, and computational cost.
 
-In addition to clustering quality, computational efficiency is an important consideration in high-dimensional settings. Methods that reduce dimension can lower per-iteration cost and memory usage, but may introduce additional overhead from estimating the subspace. For this reason, this study evaluates both clustering performance and computational scalability.
+Computational efficiency is an important consideration in high-dimensional settings. Methods that reduce dimension can lower per-iteration cost and memory usage, but may introduce additional overhead from estimating the subspace. For this reason, this study evaluates both clustering performance and computational scalability.
 
-Because clustering is unsupervised, validation relies on internal criteria, stability, and interpretability rather than labeled outcomes. In particular, the methods considered here may differ in their sensitivity to sampling variability. Probabilistic approaches can accommodate ambiguity in cluster boundaries, while subspace-based methods depend on how well the learned representation captures the underlying structure.
+Because this clustering is unsupervised, validation relies on internal criteria, stability, and interpretability rather than labeled outcomes. In particular, the methods considered here may differ in their sensitivity to sampling variability. Probabilistic approaches can accommodate ambiguity in cluster boundaries, while subspace-based methods depend on how well the learned representation captures the underlying structure.
 
-To assess these differences, this study evaluates clustering **stability under bootstrap resampling**, using agreement between partitions as a primary criterion. Stability provides a complementary perspective to internal fit measures, especially in settings where cluster structure may be weak or sensitive to representation. Accordingly, the evaluation considers multiple complementary metrics rather than relying on a single measure.
+To assess these differences, this study evaluates clustering stability under bootstrap resampling, using agreement between partitions as a primary criterion. Stability provides a complementary perspective to internal fit measures, especially in settings where cluster structure may be weak or sensitive to representation. Accordingly, the evaluation considers multiple complementary metrics rather than relying on a single measure.
 
