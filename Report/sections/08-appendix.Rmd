@@ -94,7 +94,7 @@ knitr::kable(
 \resizebox{\textwidth}{!}{
 \begin{tabular}{rrrrrrrr}
 \toprule
-Embedding dimension & \(\nu\) & Clusters & Retained factors & Runtime (s) & Average silhouette width & Calinski--Harabasz index & Probability silhouette \\
+Embedding dimension & \(\nu\) & Clusters & Retained factors & Runtime (s) & Average Silhouette Width & Calinski--Harabasz index & Probability Silhouette \\
 \midrule
 64  & 6  & 2 & 4 & 241.74 & 0.012  & 70.55 & 0.143 \\
 64  & 10 & 2 & 4 & 77.76  & 0.012  & 69.93 & 0.143 \\
@@ -106,7 +106,7 @@ Embedding dimension & \(\nu\) & Clusters & Retained factors & Runtime (s) & Aver
 \end{tabular}
 }
 \end{table}
-```
+
 
 
 

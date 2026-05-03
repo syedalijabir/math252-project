@@ -1,0 +1,402 @@
+---
+title: "MovieLens 1M: Bootstrap Stability Comparison — All Methods"
+author: ""
+date: "`r format(Sys.Date())`"
+output:
+  pdf_document:
+    latex_engine: xelatex
+fontsize: 11pt
+geometry: margin=1in
+---
+
+<!--
+================================================================================
+  GOAL
+  ----
+  Load the cached bootstrap stability results for all four clustering methods
+  (K-Means, RKM, PD, FPDC) and produce a set of comparison plots:
+
+    Plot 1 — All four methods on one panel per embedding (line plot of mean ARI)
+    Plot 2 — Faceted by method, all embeddings overlaid (colour = embedding)
+    Plot 3 — Heatmap of mean ARI across (method × embedding × k)
+    Plot 4 — Boxplots of per-replicate ARI distributions by method
+    Plot 5 — Reference silhouette vs. bootstrap ARI scatter (method quality)
+
+  All data come from previously saved .rds bootstrap cache files.
+  No clustering models are re-fitted here.
+================================================================================
+-->
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo    = TRUE,
+  warning = FALSE,
+  message = FALSE,
+  fig.width  = 10,
+  fig.height = 6,
+  dpi = 150
+)
+```
+
+# 1. Requirements
+
+```{r requirements}
+required_packages <- c("dplyr", "tidyr", "ggplot2", "readr", "patchwork")
+
+installed    <- rownames(installed.packages())
+missing_pkgs <- setdiff(required_packages, installed)
+if (length(missing_pkgs) > 0) install.packages(missing_pkgs)
+
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(readr)
+library(patchwork)
+```
+
+# 2. Settings
+
+```{r settings}
+# ── Cache directories ────────────────────────────────────────────────────────
+boot_cache_dir <- "output/bootstrap_stability_cache"
+
+# ── Experiment grid ──────────────────────────────────────────────────────────
+embedding_tags <- c("user_embeddings_64", "user_embeddings_128", "user_embeddings_256")
+k_values       <- c(2, 3, 4)
+methods        <- c("KMeans", "RKM", "PD", "FPDC")
+
+# ── Shared aesthetics ────────────────────────────────────────────────────────
+method_colors <- c(
+  KMeans = "#E07B54",
+  RKM    = "#5B8DB8",
+  PD     = "#4DB8A4",
+  FPDC   = "#A67BB5"
+)
+
+embedding_labels <- c(
+  user_embeddings_64  = "64-dimensional",
+  user_embeddings_128 = "128-dimensional",
+  user_embeddings_256 = "256-dimensional"
+)
+
+base_theme <- theme_minimal(base_size = 11) +
+  theme(
+    strip.text       = element_text(face = "bold"),
+    panel.grid.minor = element_blank(),
+    legend.position  = "bottom"
+  )
+```
+
+# 3. Load cached bootstrap results
+
+```{r load-cache}
+# ── Helper: load one (method, embedding, k) cache file ───────────────────────
+load_boot_cache <- function(method, embedding_tag, k_val,
+                            cache_dir = boot_cache_dir) {
+  prefix <- switch(method,
+    KMeans = "bootstrap_kmeans",
+    RKM    = "bootstrap_rkm",
+    PD     = "bootstrap_pd",
+    FPDC   = "bootstrap_fpdc"
+  )
+
+  fpath <- file.path(cache_dir,
+                     paste0(prefix, "_", embedding_tag, "_k", k_val, ".rds"))
+
+  if (!file.exists(fpath)) return(NULL)
+
+  obj <- readRDS(fpath)
+
+  # Extract the ARI vector — field name differs by method
+  ari_vec <- switch(method,
+    KMeans = obj$kmeans_boot_ari,
+    RKM    = obj$rkm_boot_ari,
+    PD     = obj$pd_boot_ari,
+    FPDC   = obj$fpdc_boot_ari
+  )
+
+  # Extract reference silhouette — field name differs by method
+  ref_sil <- switch(method,
+    KMeans = obj$kmeans_reference_silhouette,
+    RKM    = obj$rkm_reference_silhouette,
+    PD     = obj$pd_reference_silhouette,
+    FPDC   = obj$fpdc_reference_silhouette
+  )
+
+  data.frame(
+    method        = method,
+    embedding     = embedding_tag,
+    k             = k_val,
+    replicate     = seq_along(ari_vec),
+    ari           = ari_vec,
+    ref_silhouette = if (length(ref_sil) == 1) ref_sil else NA_real_,
+    stringsAsFactors = FALSE
+  )
+}
+
+# ── Load all combinations ────────────────────────────────────────────────────
+all_replicates <- bind_rows(lapply(methods, function(m) {
+  bind_rows(lapply(embedding_tags, function(e) {
+    bind_rows(lapply(k_values, function(k) {
+      load_boot_cache(m, e, k)
+    }))
+  }))
+})) %>%
+  mutate(
+    method    = factor(method,    levels = methods),
+    embedding = factor(embedding, levels = embedding_tags,
+                       labels = embedding_labels),
+    k         = as.integer(k)
+  )
+
+# ── Summary: mean ± SD per (method, embedding, k) ────────────────────────────
+summary_df <- all_replicates %>%
+  group_by(method, embedding, k) %>%
+  summarise(
+    ari_mean   = mean(ari,  na.rm = TRUE),
+    ari_sd     = sd(ari,    na.rm = TRUE),
+    ari_median = median(ari, na.rm = TRUE),
+    n_valid    = sum(is.finite(ari)),
+    ref_sil    = first(ref_silhouette),
+    .groups = "drop"
+  )
+
+cat("Loaded", nrow(all_replicates), "replicate rows across",
+    n_distinct(all_replicates$method), "methods,",
+    n_distinct(all_replicates$embedding), "embeddings,",
+    n_distinct(all_replicates$k), "k values.\n")
+```
+
+# 4. Plot 1 — All methods on one plot, faceted by embedding
+
+```{r plot1-all-methods}
+# One panel per embedding dimension.
+# Lines connect k values; colour distinguishes method.
+# Error bars show ± 1 SD across bootstrap replicates.
+
+p1 <- ggplot(summary_df,
+             aes(x = k, y = ari_mean,
+                 colour = method, group = method)) +
+  geom_hline(yintercept = 0, linetype = "dashed",
+             colour = "grey60", linewidth = 0.4) +
+  geom_errorbar(
+    aes(ymin = ari_mean - ari_sd,
+        ymax = ari_mean + ari_sd),
+    width = 0.15, alpha = 0.4, linewidth = 0.6,
+    position = position_dodge(width = 0.2)
+  ) +
+  geom_line(linewidth = 1,
+            position = position_dodge(width = 0.2)) +
+  geom_point(size = 2.5,
+             position = position_dodge(width = 0.2)) +
+  facet_wrap(~ embedding, nrow = 1) +
+  scale_x_continuous(breaks = k_values) +
+  scale_colour_manual(values = method_colors, name = "Method") +
+  labs(
+    title = "Bootstrap Stability: All Methods by Embedding Dimension",
+    x     = "Number of clusters (k)",
+    y     = "Mean bootstrap ARI (± 1 SD)"
+  ) +
+  base_theme
+
+p1
+
+ggsave("figures/stability_all_methods_by_embedding.png", p1,
+       width = 11, height = 5, dpi = 300)
+```
+
+# 5. Plot 2 — Faceted by method, embeddings overlaid
+
+```{r plot2-by-method}
+# One panel per method.
+# Lines connect k values; colour distinguishes embedding dimension.
+# Allows within-method comparison across embedding sizes.
+
+embedding_colors <- c(
+  "64-dimensional"  = "#F4A261",
+  "128-dimensional" = "#2A9D8F",
+  "256-dimensional" = "#457B9D"
+)
+
+p2 <- ggplot(summary_df,
+             aes(x = k, y = ari_mean,
+                 colour = embedding, group = embedding)) +
+  geom_hline(yintercept = 0, linetype = "dashed",
+             colour = "grey60", linewidth = 0.4) +
+  geom_errorbar(
+    aes(ymin = ari_mean - ari_sd,
+        ymax = ari_mean + ari_sd),
+    width = 0.15, alpha = 0.4, linewidth = 0.6,
+    position = position_dodge(width = 0.2)
+  ) +
+  geom_line(linewidth = 1,
+            position = position_dodge(width = 0.2)) +
+  geom_point(size = 2.5,
+             position = position_dodge(width = 0.2)) +
+  facet_wrap(~ method, nrow = 1, scales = "free_y") +
+  scale_x_continuous(breaks = k_values) +
+  scale_colour_manual(values = embedding_colors, name = "Embedding") +
+  labs(
+    title = "Bootstrap Stability: All Embeddings by Method",
+    x     = "Number of clusters (k)",
+    y     = "Mean bootstrap ARI (± 1 SD)"
+  ) +
+  base_theme
+
+p2
+
+ggsave("figures/stability_all_embeddings_by_method.png", p2,
+       width = 13, height = 5, dpi = 300)
+```
+
+# 6. Plot 3 — Heatmap of mean ARI across all (method × embedding × k)
+
+```{r plot3-heatmap}
+# Each cell shows the mean bootstrap ARI.
+# Rows = method × k combinations; columns = embedding dimension.
+# Makes it easy to spot which cells are strong vs. near-zero.
+
+heatmap_df <- summary_df %>%
+  mutate(
+    method_k = paste0(method, "  k=", k),
+    method_k = factor(method_k,
+                      levels = rev(paste0(
+                        rep(methods, each = length(k_values)),
+                        "  k=",
+                        rep(k_values, times = length(methods))
+                      )))
+  )
+
+p3 <- ggplot(heatmap_df,
+             aes(x = embedding, y = method_k, fill = ari_mean)) +
+  geom_tile(colour = "white", linewidth = 0.5) +
+  geom_text(aes(label = sprintf("%.3f", ari_mean)),
+            size = 3, colour = "white", fontface = "bold") +
+  scale_fill_gradient2(
+    low      = "#C0392B",
+    mid      = "#F5CBA7",
+    high     = "#1A5276",
+    midpoint = 0,
+    name     = "Mean ARI",
+    limits   = c(
+      min(heatmap_df$ari_mean, na.rm = TRUE),
+      max(heatmap_df$ari_mean, na.rm = TRUE)
+    )
+  ) +
+  labs(
+    title = "Mean Bootstrap ARI Heatmap",
+    x     = "Embedding dimension",
+    y     = "Method and k"
+  ) +
+  theme_minimal(base_size = 11) +
+  theme(
+    axis.text.x  = element_text(angle = 20, hjust = 1),
+    panel.grid   = element_blank(),
+    legend.position = "right"
+  )
+
+p3
+
+ggsave("figures/stability_heatmap.png", p3,
+       width = 9, height = 8, dpi = 300)
+```
+
+# 7. Plot 4 — Boxplots of per-replicate ARI by method
+
+```{r plot4-boxplots}
+# Shows the full distribution of ARI values across replicates,
+# not just the mean. One panel per embedding.
+# Reveals whether instability comes from high variance or low mean.
+
+p4 <- ggplot(all_replicates,
+             aes(x = factor(k), y = ari, fill = method)) +
+  geom_hline(yintercept = 0, linetype = "dashed",
+             colour = "grey60", linewidth = 0.4) +
+  geom_boxplot(
+    outlier.size  = 0.8,
+    outlier.alpha = 0.5,
+    alpha         = 0.75,
+    linewidth     = 0.4,
+    position      = position_dodge(width = 0.85)
+  ) +
+  facet_wrap(~ embedding, nrow = 1) +
+  scale_fill_manual(values = method_colors, name = "Method") +
+  labs(
+    title = "Bootstrap ARI Distributions by Method, Embedding, and k",
+    x     = "Number of clusters (k)",
+    y     = "Bootstrap ARI"
+  ) +
+  base_theme
+
+p4
+
+ggsave("figures/stability_boxplots.png", p4,
+       width = 13, height = 6, dpi = 300)
+```
+
+# 8. Plot 5 — Reference silhouette vs. mean bootstrap ARI
+
+```{r plot5-sil-vs-ari}
+# Scatter plot: x = reference (full-data) silhouette width,
+#               y = mean bootstrap ARI.
+# Each point is one (method, embedding, k) combination.
+# A method in the top-right quadrant is both internally valid
+# and stable — the ideal outcome.
+
+p5 <- ggplot(summary_df,
+             aes(x = ref_sil, y = ari_mean,
+                 colour = method, shape = embedding)) +
+  geom_hline(yintercept = 0, linetype = "dashed",
+             colour = "grey70", linewidth = 0.4) +
+  geom_vline(xintercept = 0, linetype = "dashed",
+             colour = "grey70", linewidth = 0.4) +
+  geom_point(size = 3, alpha = 0.85) +
+  scale_colour_manual(values = method_colors, name = "Method") +
+  scale_shape_manual(
+    values = c("64-dimensional" = 16, "128-dimensional" = 17,
+               "256-dimensional" = 15),
+    name = "Embedding"
+  ) +
+  labs(
+    title    = "Internal Validity vs. Bootstrap Stability",
+    subtitle = "Top-right = strong silhouette and stable partition",
+    x        = "Reference silhouette width (full-data solution)",
+    y        = "Mean bootstrap ARI"
+  ) +
+  base_theme +
+  theme(legend.position = "right")
+
+p5
+
+ggsave("figures/stability_sil_vs_ari.png", p5,
+       width = 9, height = 6, dpi = 300)
+```
+
+# 9. Summary table
+
+```{r summary-table}
+summary_wide <- summary_df %>%
+  select(method, embedding, k, ari_mean, ari_sd, ari_median, n_valid, ref_sil) %>%
+  arrange(method, embedding, k)
+
+knitr::kable(
+  summary_wide,
+  digits  = 3,
+  col.names = c("Method", "Embedding", "k",
+                "Mean ARI", "SD ARI", "Median ARI",
+                "Valid reps", "Ref. silhouette"),
+  caption = "Bootstrap stability summary across all methods, embeddings, and k values."
+)
+
+write.csv(
+  summary_wide,
+  file      = "output/bootstrap_stability_results/bootstrap_stability_all_methods_summary.csv",
+  row.names = FALSE
+)
+
+write.csv(
+  all_replicates,
+  file      = "output/bootstrap_stability_results/bootstrap_stability_all_methods_replicates.csv",
+  row.names = FALSE
+)
+```
