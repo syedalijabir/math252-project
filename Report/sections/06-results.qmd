@@ -2,7 +2,7 @@
 
 This section compares clustering performance across embedding dimensions and methods
 using the pre-specified method-specific tuning criteria, with average silhouette width,
-the Calinski-Harabasz (CH) index, runtime, and bootstrap stability used to interpret
+the CH index, runtime, and bootstrap stability used to interpret
 the selected solutions.
 
 \begin{table}[htbp]
@@ -34,11 +34,11 @@ Table \ref{tbl-best-models} reports the final selected model for each method and
 embedding dimension under the pre-specified method-specific tuning rules. Under these
 rules, RKM produced the strongest overall hard partitions. The best overall
 solution used the 128-dimensional embeddings, 2 clusters, and 4 retained factors, and
-it achieved an average silhouette width of 0.331 and a Calinski-Harabasz index of
+it achieved an average silhouette width of 0.331 and a CH index of
 139.52. The 256-dimensional RKM model followed with 2 clusters and 5
-retained factors, silhouette 0.290, and Calinski-Harabasz index 111.25. The
+retained factors, silhouette 0.290, and CH index 111.25. The
 64-dimensional RKM model selected 2 clusters and 2 retained factors and
-achieved silhouette 0.235 and Calinski-Harabasz index 132.29.
+achieved silhouette 0.235 and CH index 132.29.
 
 K-means behaved differently under the revised selection rules because we prioritized
 the within-cluster sum of squares elbow diagnostic. The elbow diagnostic selected 4
