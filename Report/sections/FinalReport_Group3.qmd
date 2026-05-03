@@ -1,0 +1,1024 @@
+---
+title: "Reel Intelligence: MovieLens Clustering"
+subtitle: "Final Project Report, Spring 2026"
+author:
+  - Ali Jabir
+  - Isis Martínez
+  - Susan Peck
+date: "May 2, 2026"
+format:
+  pdf:
+    latex-auto-install: true
+    latex-tinytex: false
+    keep-tex: false
+fontsize: 11pt
+geometry: margin=1in
+header-includes:
+  - \usepackage{amsmath}
+  - \usepackage{amssymb}
+  - \usepackage{booktabs}
+  - \usepackage{longtable}
+  - \usepackage{array}
+  - \usepackage{float}
+  - \usepackage{setspace}
+  - \usepackage{graphicx}
+  - \usepackage{caption}
+  - \usepackage{hyperref}
+bibliography: refs.bib
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = FALSE,
+  warning = FALSE,
+  message = FALSE,
+  fig.width = 8,
+  fig.height = 5.5,
+  dpi = 120
+)
+
+library(dplyr)
+library(ggplot2)
+library(knitr)
+library(scales)
+
+
+
+# Report/R/compare_results_helpers.R
+
+suppressPackageStartupMessages({
+  library(dplyr)
+  library(ggplot2)
+  library(knitr)
+  library(mclust)
+  library(purrr)
+  library(scales)
+  library(stringr)
+  library(tidyr)
+})
+
+`%||%` <- function(x, y) {
+  if (is.null(x)) y else x
+}
+
+report_theme <- function() {
+  theme_minimal(base_size = 12) +
+    theme(
+      plot.title = element_text(face = "bold", size = 13, hjust = 0.5),
+      plot.subtitle = element_text(size = 10, hjust = 0.5),
+      axis.title = element_text(face = "bold"),
+      strip.text = element_text(face = "bold"),
+      legend.title = element_text(face = "bold"),
+      panel.grid.minor = element_blank(),
+      panel.grid.major.x = element_blank(),
+      plot.margin = margin(10, 12, 10, 12)
+    )
+}
+
+blank_plot <- function(title, subtitle = NULL) {
+  ggplot() +
+    theme_void() +
+    labs(title = title, subtitle = subtitle)
+}
+
+resolve_cache_sources <- function(cache_root = file.path("..", "output", "benchmark_cache")) {
+  candidates <- c(
+    cache_root,
+    file.path("..", "output", "kmeans_cache"),
+    file.path("..", "output", "pd_cache"),
+    file.path("..", "output", "rkm_cache"),
+    file.path("..", "output", "fpdc_cache")
+  )
+  
+  existing <- unique(candidates[dir.exists(candidates)])
+  
+  if (length(existing) == 0) {
+    stop(
+      paste(
+        "No cache directories were found.",
+        "Expected either ../output/benchmark_cache or the per-method cache folders under ../output/."
+      )
+    )
+  }
+  
+  normalizePath(existing, winslash = "/", mustWork = FALSE)
+}
+
+parse_model_filename <- function(filename) {
+  patterns <- list(
+    KMeans = "^kmeans_(user_embeddings_([0-9]+))_k([0-9]+)\\.rds$",
+    PD     = "^pd_(user_embeddings_([0-9]+))_k([0-9]+)\\.rds$",
+    RKM    = "^rkm_(user_embeddings_([0-9]+))_k([0-9]+)_(?:q|nf)([0-9]+)\\.rds$",
+    FPDC   = "^fpdc_(user_embeddings_([0-9]+))_k([0-9]+)_(?:q|nf)([0-9]+)(?:_nu([0-9]+))?\\.rds$"
+  )
+  
+  if (str_detect(filename, patterns$KMeans)) {
+    m <- str_match(filename, patterns$KMeans)
+    return(tibble(
+      method = "KMeans",
+      embedding = m[, 2],
+      embedding_dim = as.integer(m[, 3]),
+      k = as.integer(m[, 4]),
+      q = NA_integer_,
+      nu = NA_integer_
+    ))
+  }
+  
+  if (str_detect(filename, patterns$PD)) {
+    m <- str_match(filename, patterns$PD)
+    return(tibble(
+      method = "PD",
+      embedding = m[, 2],
+      embedding_dim = as.integer(m[, 3]),
+      k = as.integer(m[, 4]),
+      q = NA_integer_,
+      nu = NA_integer_
+    ))
+  }
+  
+  if (str_detect(filename, patterns$RKM)) {
+    m <- str_match(filename, patterns$RKM)
+    return(tibble(
+      method = "RKM",
+      embedding = m[, 2],
+      embedding_dim = as.integer(m[, 3]),
+      k = as.integer(m[, 4]),
+      q = as.integer(m[, 5]),
+      nu = NA_integer_
+    ))
+  }
+  
+  if (str_detect(filename, patterns$FPDC)) {
+    m <- str_match(filename, patterns$FPDC)
+    parsed_nu <- suppressWarnings(as.integer(m[, 6]))
+    return(tibble(
+      method = "FPDC",
+      embedding = m[, 2],
+      embedding_dim = as.integer(m[, 3]),
+      k = as.integer(m[, 4]),
+      q = as.integer(m[, 5]),
+      nu = ifelse(is.na(parsed_nu), 10L, parsed_nu)
+    ))
+  }
+  
+  tibble(
+    method = NA_character_,
+    embedding = NA_character_,
+    embedding_dim = NA_integer_,
+    k = NA_integer_,
+    q = NA_integer_,
+    nu = NA_integer_
+  )
+}
+
+list_model_files <- function(cache_root = file.path("..", "output", "benchmark_cache")) {
+  all_files <- unlist(
+    lapply(
+      resolve_cache_sources(cache_root),
+      function(path) list.files(path, pattern = "\\.rds$", recursive = TRUE, full.names = TRUE)
+    ),
+    use.names = FALSE
+  )
+  
+  tibble(file = sort(unique(all_files))) %>%
+    mutate(filename = basename(file)) %>%
+    mutate(meta = purrr::map(filename, parse_model_filename)) %>%
+    tidyr::unnest(meta) %>%
+    filter(!is.na(method)) %>%
+    select(file, method, embedding, embedding_dim, k, q, nu)
+}
+
+find_value <- function(obj, candidate_names) {
+  locations <- list(obj)
+  
+  if (is.list(obj) && "model" %in% names(obj) && !is.null(obj$model)) {
+    locations <- c(locations, list(obj$model))
+  }
+  
+  for (loc in locations) {
+    if (is.null(loc) || !is.list(loc)) next
+    
+    for (nm in candidate_names) {
+      if (nm %in% names(loc) && !is.null(loc[[nm]])) {
+        return(loc[[nm]])
+      }
+    }
+  }
+  
+  NULL
+}
+
+coerce_num <- function(x) {
+  if (is.null(x) || length(x) == 0) return(NA_real_)
+  suppressWarnings(as.numeric(x)[1])
+}
+
+extract_labels <- function(obj) {
+  direct_labels <- find_value(obj, c("labels", "label", "cluster", "clustering"))
+  if (!is.null(direct_labels)) {
+    return(as.integer(unlist(direct_labels)))
+  }
+  
+  posterior <- find_value(obj, c("probabilities", "posterior", "post", "u"))
+  if (is.matrix(posterior) || is.data.frame(posterior)) {
+    return(max.col(as.matrix(posterior), ties.method = "first"))
+  }
+  
+  NULL
+}
+
+extract_runtime <- function(obj) {
+  coerce_num(find_value(obj, c("runtime_sec", "runtime_total_sec", "runtime", "elapsed_sec", "elapsed")))
+}
+
+extract_silhouette <- function(obj) {
+  coerce_num(find_value(obj, c("Silhouette", "avg_silhouette", "silhouette", "avg_width")))
+}
+
+extract_ch <- function(obj) {
+  coerce_num(find_value(obj, c("CH", "ch", "calinski_harabasz")))
+}
+
+extract_prob_silhouette <- function(obj) {
+  coerce_num(find_value(obj, c("ProbSilh", "prob_silh", "probability_silhouette")))
+}
+
+read_model_record <- function(file, method, embedding, embedding_dim, k, q, nu) {
+  obj <- tryCatch(readRDS(file), error = function(e) NULL)
+  
+  if (is.null(obj)) {
+    return(tibble(
+      file = file,
+      method = method,
+      embedding = embedding,
+      embedding_dim = embedding_dim,
+      k = k,
+      q = q,
+      nu = nu,
+      runtime_sec = NA_real_,
+      silhouette = NA_real_,
+      ch = NA_real_,
+      prob_silh = NA_real_,
+      n_obs = NA_integer_,
+      status = "read_error",
+      labels = list(NULL)
+    ))
+  }
+  
+  labels <- extract_labels(obj)
+  
+  tibble(
+    file = file,
+    method = method,
+    embedding = embedding,
+    embedding_dim = embedding_dim,
+    k = k,
+    q = q,
+    nu = nu,
+    runtime_sec = extract_runtime(obj),
+    silhouette = extract_silhouette(obj),
+    ch = extract_ch(obj),
+    prob_silh = extract_prob_silhouette(obj),
+    n_obs = if (is.null(labels)) NA_integer_ else length(labels),
+    status = "ok",
+    labels = list(labels)
+  )
+}
+
+compute_ari <- function(metrics_df) {
+  usable <- metrics_df %>%
+    filter(status == "ok", !is.na(k), !purrr::map_lgl(labels, is.null))
+  
+  if (nrow(usable) < 2) {
+    return(tibble())
+  }
+  
+  ari_rows <- list()
+  counter <- 1
+  
+  for (emb in sort(unique(usable$embedding_dim))) {
+    current_emb <- usable %>% filter(embedding_dim == emb)
+    
+    for (k_val in sort(unique(current_emb$k))) {
+      current <- current_emb %>% filter(k == k_val)
+      if (nrow(current) < 2) next
+      
+      for (i in seq_len(nrow(current) - 1)) {
+        for (j in (i + 1):nrow(current)) {
+          labels_i <- current$labels[[i]]
+          labels_j <- current$labels[[j]]
+          
+          if (is.null(labels_i) || is.null(labels_j)) next
+          if (length(labels_i) != length(labels_j)) next
+          
+          ari_rows[[counter]] <- tibble(
+            embedding_dim = emb,
+            k = k_val,
+            method_1 = as.character(current$method[i]),
+            method_2 = as.character(current$method[j]),
+            q_1 = current$q[i],
+            q_2 = current$q[j],
+            nu_1 = current$nu[i],
+            nu_2 = current$nu[j],
+            ari = tryCatch(
+              mclust::adjustedRandIndex(labels_i, labels_j),
+              error = function(e) NA_real_
+            )
+          )
+          counter <- counter + 1
+        }
+      }
+    }
+  }
+  
+  bind_rows(ari_rows)
+}
+
+summarise_ari <- function(ari_df) {
+  if (nrow(ari_df) == 0) {
+    return(tibble())
+  }
+  
+  ari_df %>%
+    mutate(method_pair = paste(pmin(method_1, method_2), pmax(method_1, method_2), sep = "_vs_")) %>%
+    group_by(method_pair) %>%
+    summarise(
+      n_comparisons = n(),
+      avg_ari = mean(ari, na.rm = TRUE),
+      median_ari = median(ari, na.rm = TRUE),
+      min_ari = min(ari, na.rm = TRUE),
+      max_ari = max(ari, na.rm = TRUE),
+      .groups = "drop"
+    ) %>%
+    arrange(desc(avg_ari))
+}
+
+format_best_table <- function(best_models_df) {
+  best_models_df %>%
+    mutate(
+      q_display = case_when(
+        method %in% c("RKM", "FPDC") & !is.na(q) ~ as.character(q),
+        TRUE ~ "—"
+      ),
+      nu_display = case_when(
+        method == "FPDC" & !is.na(nu) ~ as.character(nu),
+        TRUE ~ "—"
+      ),
+      prob_silh_display = case_when(
+        !is.na(prob_silh) ~ sprintf("%.3f", prob_silh),
+        TRUE ~ "—"
+      )
+    ) %>%
+    transmute(
+      Method = as.character(method),
+      Embedding = embedding_dim,
+      k = k,
+      q = q_display,
+      nu = nu_display,
+      Runtime_sec = round(runtime_sec, 1),
+      Silhouette = round(silhouette, 3),
+      CH = round(ch, 2),
+      ProbSilh = prob_silh_display
+    )
+}
+
+format_ari_summary_table <- function(ari_summary) {
+  if (nrow(ari_summary) == 0) {
+    return(tibble(Note = "No pairwise ARI results were available from the cached models."))
+  }
+  
+  ari_summary %>%
+    transmute(
+      Method_Pair = str_replace_all(method_pair, "_vs_", " vs "),
+      Comparisons = n_comparisons,
+      Average_ARI = round(avg_ari, 3),
+      Median_ARI = round(median_ari, 3),
+      Min_ARI = round(min_ari, 3),
+      Max_ARI = round(max_ari, 3)
+    )
+}
+
+build_compare_results_data <- function(
+    cache_root = file.path("..", "output", "benchmark_cache"),
+    save_csv = FALSE,
+    output_dir = file.path("figures", "compare_results")
+) {
+  meta <- list_model_files(cache_root)
+  
+  if (nrow(meta) == 0) {
+    stop("No per-model .rds files matched the expected naming patterns.")
+  }
+  
+  metrics_df <- purrr::pmap_dfr(meta, read_model_record) %>%
+    mutate(
+      method = factor(method, levels = c("KMeans", "PD", "RKM", "FPDC")),
+      embedding_label = factor(
+        embedding_dim,
+        levels = sort(unique(embedding_dim)),
+        labels = paste0(sort(unique(embedding_dim)), "-dimensional")
+      ),
+      model_id = paste0(
+        method, "__",
+        embedding, "__k", k,
+        ifelse(is.na(q), "", paste0("__q", q)),
+        ifelse(is.na(nu), "", paste0("__nu", nu))
+      )
+    )
+  
+  plot_df <- metrics_df %>%
+    arrange(method, embedding_dim, k, q, nu)
+  
+  best_models_df <- plot_df %>%
+    filter(!is.na(silhouette)) %>%
+    group_by(method, embedding_dim, embedding_label) %>%
+    arrange(desc(silhouette), desc(ch), .by_group = TRUE) %>%
+    slice(1) %>%
+    ungroup() %>%
+    arrange(embedding_dim, method)
+  
+  if (nrow(best_models_df) == 0) {
+    stop("No valid silhouette scores were found in the cached results.")
+  }
+  
+  best_table <- format_best_table(best_models_df)
+  overall_best <- best_models_df %>% arrange(desc(silhouette), desc(ch)) %>% slice(1)
+  ari_df <- compute_ari(plot_df)
+  ari_summary <- summarise_ari(ari_df)
+  
+  if (isTRUE(save_csv)) {
+    dir.create(output_dir, recursive = TRUE, showWarnings = FALSE)
+    
+    write.csv(plot_df %>% select(-labels), file.path(output_dir, "plot_ready_metrics.csv"), row.names = FALSE)
+    write.csv(best_models_df %>% select(-labels), file.path(output_dir, "best_models_numeric.csv"), row.names = FALSE)
+    write.csv(best_table, file.path(output_dir, "best_models_report_table.csv"), row.names = FALSE)
+    
+    if (nrow(ari_df) > 0) {
+      write.csv(ari_df, file.path(output_dir, "ari_pairwise_same_embedding_same_k.csv"), row.names = FALSE)
+    }
+    
+    if (nrow(ari_summary) > 0) {
+      write.csv(ari_summary, file.path(output_dir, "ari_summary_by_method_pair.csv"), row.names = FALSE)
+    }
+  }
+  
+  list(
+    meta = meta,
+    metrics_df = metrics_df,
+    plot_df = plot_df,
+    best_models_df = best_models_df,
+    best_table = best_table,
+    overall_best = overall_best,
+    ari_df = ari_df,
+    ari_summary = ari_summary
+  )
+}
+
+plot_best_silhouette_by_method_embedding <- function(plot_df) {
+  fig_df <- plot_df %>%
+    filter(!is.na(silhouette)) %>%
+    group_by(method, embedding_label) %>%
+    summarise(best_silhouette = max(silhouette, na.rm = TRUE), .groups = "drop")
+  
+  ggplot(fig_df, aes(x = embedding_label, y = best_silhouette, fill = method)) +
+    geom_col(position = position_dodge(width = 0.75), width = 0.65) +
+    labs(
+      title = "Best Silhouette Score by Method and Embedding Dimension",
+      x = "Embedding dimension",
+      y = "Best average silhouette width",
+      fill = "Method"
+    ) +
+    report_theme()
+}
+
+plot_runtime_vs_silhouette <- function(plot_df) {
+  fig_df <- plot_df %>% filter(!is.na(runtime_sec), !is.na(silhouette))
+  
+  if (nrow(fig_df) == 0) {
+    return(blank_plot("Runtime-performance plot unavailable"))
+  }
+  
+  ggplot(fig_df, aes(x = runtime_sec, y = silhouette, color = method, shape = method)) +
+    geom_point(size = 2.6, alpha = 0.85) +
+    scale_x_log10(labels = scales::label_number()) +
+    labs(
+      title = "Runtime-Performance Tradeoff",
+      subtitle = "Lower runtime and higher silhouette are preferred",
+      x = "Runtime (seconds, log scale)",
+      y = "Average silhouette width",
+      color = "Method",
+      shape = "Method"
+    ) +
+    report_theme()
+}
+
+plot_ari_method_pairs <- function(ari_df) {
+  if (nrow(ari_df) == 0) {
+    return(blank_plot("Average ARI by method pair unavailable"))
+  }
+  
+  fig_df <- ari_df %>%
+    filter(method_1 != method_2) %>%
+    mutate(method_pair = paste(pmin(method_1, method_2), pmax(method_1, method_2), sep = " vs ")) %>%
+    group_by(method_pair) %>%
+    summarise(avg_ari = mean(ari, na.rm = TRUE), .groups = "drop") %>%
+    arrange(desc(avg_ari))
+  
+  ggplot(fig_df, aes(x = reorder(method_pair, avg_ari), y = avg_ari)) +
+    geom_col(width = 0.7) +
+    coord_flip() +
+    labs(
+      title = "Average Adjusted Rand Index by Method Pair",
+      subtitle = "Higher ARI indicates stronger agreement between clustering solutions",
+      x = "Method pair",
+      y = "Average ARI"
+    ) +
+    report_theme()
+}
+
+plot_silhouette_vs_k <- function(plot_df, methods = c("KMeans", "PD")) {
+  fig_df <- plot_df %>%
+    filter(method %in% methods, !is.na(silhouette)) %>%
+    select(method, embedding_label, k, silhouette)
+  
+  if (nrow(fig_df) == 0) {
+    return(blank_plot("Silhouette-by-k plot unavailable"))
+  }
+  
+  ggplot(fig_df, aes(x = k, y = silhouette, color = method, group = method)) +
+    geom_line(linewidth = 0.9) +
+    geom_point(size = 2) +
+    facet_wrap(~ embedding_label, nrow = 1) +
+    scale_x_continuous(breaks = sort(unique(fig_df$k))) +
+    labs(
+      title = "Silhouette Scores Across k",
+      subtitle = paste(paste(methods, collapse = " and "), "across embedding dimensions"),
+      x = "Number of clusters (k)",
+      y = "Average silhouette width",
+      color = "Method"
+    ) +
+    report_theme()
+}
+
+plot_rkm_sensitivity <- function(plot_df) {
+  fig_df <- plot_df %>%
+    filter(method == "RKM", !is.na(q), !is.na(silhouette))
+  
+  if (nrow(fig_df) == 0) {
+    return(blank_plot("RKM tuning plot unavailable"))
+  }
+  
+  ggplot(fig_df, aes(x = k, y = silhouette, color = factor(q), group = q)) +
+    geom_line(linewidth = 0.9) +
+    geom_point(size = 2) +
+    facet_wrap(~ embedding_label, nrow = 1) +
+    scale_x_continuous(breaks = sort(unique(fig_df$k))) +
+    labs(
+      title = "Reduced K-means: Silhouette Scores Across k and q",
+      subtitle = "Supporting diagnostic for the reduced K-means tuning grid",
+      x = "Number of clusters (k)",
+      y = "Average silhouette width",
+      color = "q"
+    ) +
+    report_theme()
+}
+
+plot_prob_silhouette <- function(plot_df) {
+  fig_df <- plot_df %>%
+    filter(method %in% c("PD", "FPDC"), !is.na(prob_silh))
+  
+  if (nrow(fig_df) == 0) {
+    return(blank_plot("Probability silhouette plot unavailable"))
+  }
+  
+  ggplot(fig_df, aes(x = k, y = prob_silh, color = method, group = interaction(method, q, nu))) +
+    geom_line(alpha = 0.7, linewidth = 0.8) +
+    geom_point(size = 1.8) +
+    facet_wrap(~ embedding_label, nrow = 1) +
+    scale_x_continuous(breaks = sort(unique(fig_df$k))) +
+    labs(
+      title = "Probability Silhouette for PD and FPDC",
+      subtitle = "Supporting diagnostic for the probability-based methods",
+      x = "Number of clusters (k)",
+      y = "Probability silhouette",
+      color = "Method"
+    ) +
+    report_theme()
+}
+
+compare_results <- build_compare_results_data(
+  cache_root = file.path("..", "output", "benchmark_cache")
+)
+
+plot_df <- compare_results$plot_df
+best_models_df <- compare_results$best_models_df
+best_table <- compare_results$best_table
+overall_best <- compare_results$overall_best
+ari_df <- compare_results$ari_df
+ari_summary <- compare_results$ari_summary
+```
+
+
+\begin{center}
+\textbf{Clustering Analysis (Math 252)}\\
+Professor: Dr. Cristina Tortora\\
+Department of Statistics\\
+San Jose State University
+\end{center}
+
+# Abstract
+
+This study evaluates clustering structure in user embeddings learned from the MovieLens 1M dataset. We generate embeddings using a multilayer perceptron and examine three embedding dimensions (64, 128, and 256). Four clustering methods are compared: k-means, probabilistic distance (PD) clustering, reduced k-means, and factorial probabilistic distance clustering (FPDC). Because no ground-truth labels are available, evaluation is based on internal validation metrics, bootstrap stability, partition agreement, and runtime.
+
+The results provide only modest evidence of clustering structure in the learned embeddings. Reduced K-means produces the strongest and most consistent hard partitions, particularly in the 128-dimensional embedding space. K-means recovers similar structure but is sensitive to the choice of tuning criterion. In contrast, PD clustering and FPDC do not yield stable or well-separated partitions under the evaluation framework used in this study. Across methods, the 128-dimensional embeddings provide the clearest clustering signal.
+
+Overall, the findings suggest that while embedding-based representations of user behavior contain some clustering tendency, the resulting structure is weak and sensitive to modeling choices, limiting strong interpretation of distinct user groups.
+
+# Introduction {#sec-introduction}
+
+Clustering is a core unsupervised learning technique used to identify structure in high-dimensional data without labeled outcomes. In movie-rating data, clustering offers an alternative to prediction-based recommender systems by focusing on groups of users with similar behavior rather than forecasting future ratings. Although this study is motivated by recommender-system data, it does not evaluate recommendation accuracy or predictive performance. Instead, it assesses clustering quality in learned embedding spaces. Coherent cluster structure in these embeddings may still have downstream relevance for personalization, recommendation, and content organization.
+
+The MovieLens datasets (see [Dataset section](#sec-dataset)) are widely used benchmarks in machine learning and recommender-systems research because they contain rich user–movie rating information. In this project, we cluster user embeddings learned from the rating data. We consider embedding dimensions of 64, 128, and 256 and compare four clustering methods: K-means, probabilistic distance clustering (PD), reduced K-means (RKM), and factorial probabilistic distance clustering (FPDC). The goal is to evaluate how embedding dimension and clustering method jointly affect the quality, stability, and interpretability of clustering solutions. Overall, we find only modest clustering structure in the learned embeddings, with RKM producing the strongest results and probabilistic methods yielding weaker and less stable partitions.
+
+This report is organized as follows. 
+[Section II](#sec-background) reviews the clustering methods used in the study. 
+[Section III](#sec-dataset) describes the dataset and preprocessing pipeline. 
+[Section IV](#sec-methods-and-experimental-setup) presents the embedding model and clustering implementation. 
+[Section V](#sec-evaluation-framework) defines the evaluation framework. 
+[Section VI](#sec-results) reports the experimental results. 
+[Section VII](#sec-conclusion-and-future-work) concludes and discusses future work.
+
+
+# Background {#sec-background}
+
+Clustering partitions observations into groups according to a notion of similarity or distance. In this study, clustering is performed in learned embedding spaces, so the geometry of the representation plays a central role in determining cluster quality. We consider four partition-based methods that differ along two key dimensions, hard vs. probabilistic assignment, and clustering in the full space vs. a learned lower-dimensional subspace.
+
+**K-means** provides a natural baseline. It assigns each observation to a single cluster by minimizing within-cluster variation, and is computationally efficient and widely used. However, it implicitly favors roughly spherical, equally sized clusters and can be sensitive to initialization, scaling, and outliers.
+
+**Probabilistic distance clustering (PD)** replaces hard assignments with probabilistic memberships determined by distances to cluster centers. This produces a soft partition in which observations can belong to multiple clusters to varying degrees. As a result, PD is typically more robust to overlap and noise, but at increased computational cost relative to K-means.
+
+High-dimensional settings motivate methods that jointly perform clustering and dimension reduction. In such cases, cluster structure may be more clearly expressed in a lower-dimensional subspace than in the original feature space. **Reduced K-means (RKM)** extends K-means by simultaneously estimating a low-dimensional projection and a partition within that subspace. By concentrating on directions that are most relevant for clustering, it can recover structure that is obscured in the full space, while retaining the simplicity of hard assignments.
+
+**Factorial probabilistic distance clustering (FPDC)** combines the ideas of PD and dimension reduction. It estimates a latent subspace together with probabilistic cluster memberships, effectively performing soft clustering in a learned representation. This allows FPDC to accommodate overlapping clusters while also mitigating the effects of high dimensionality.
+
+From this perspective, the four methods can be viewed along two orthogonal axes: assignment (hard vs. probabilistic) and representation (original space vs. learned subspace). These differences suggest potential trade-offs in robustness, interpretability, and computational cost.
+
+Computational efficiency is an important consideration in high-dimensional settings. Methods that reduce dimension can lower per-iteration cost and memory usage, but may introduce additional overhead from estimating the subspace. For this reason, this study evaluates both clustering performance and computational scalability.
+
+Because this clustering is unsupervised, validation relies on internal criteria, stability, and interpretability rather than labeled outcomes. In particular, the methods considered here may differ in their sensitivity to sampling variability. Probabilistic approaches can accommodate ambiguity in cluster boundaries, while subspace-based methods depend on how well the learned representation captures the underlying structure.
+
+To assess these differences, this study evaluates clustering stability under bootstrap resampling, using agreement between partitions as a primary criterion. Stability provides a complementary perspective to internal fit measures, especially in settings where cluster structure may be weak or sensitive to representation. Accordingly, the evaluation considers multiple complementary metrics rather than relying on a single measure.
+
+
+## Dataset {#sec-dataset}
+
+We use the MovieLens 1M dataset as the primary dataset for this project. MovieLens 1M is a standard benchmark in recommender-systems research and contains approximately 1 million ratings from 6040 users on 3706 movies. Its scale is large enough to support embedding learning and repeated clustering experiments, while still remaining computationally manageable for the full tuning and stability pipeline used in this study.
+
+The core files used in the analysis are the ratings file and the movie metadata file. The ratings data provide user identifiers, movie identifiers, numeric ratings, and timestamps. The movie metadata provide movie titles and genre labels, which are used later for descriptive interpretation of the resulting clusters. In the present study, clustering is performed at the user level, so the user--movie rating matrix is the main analytic object derived from these files.
+
+To construct the input for embedding learning, we transformed the ratings data into a sparse user--item matrix with one row per user and one column per movie. Each entry corresponds to the rating assigned by a user to a movie when that rating is observed, and is missing otherwise. As described in the Methods section, this matrix was then normalized and converted into dense user embeddings before clustering. Thus, the MovieLens 1M dataset serves as the common starting point for all embedding dimensions and clustering methods evaluated in the report.
+
+In addition to the main MovieLens 1M analysis, we also planned a small robustness check using the larger MovieLens 20M dataset. Specifically, we created two additional user-level subsets from MovieLens 20M by randomly sampling 6040 users in each case and retaining all ratings associated with those sampled users. Together with MovieLens 1M, this yielded three dataset instances of comparable user scale: the original MovieLens 1M dataset and two MovieLens 20M-based sampled subsets. The purpose of these supplementary subsets was to test whether the embedding-and-clustering pipeline behaved similarly on datasets of comparable size but drawn from a different source population. However, these supplementary MovieLens 20M subsets are not reported in the present results. Running the full experimental pipeline for every combination of embedding dimension, clustering method, tuning grid, and bootstrap stability analysis across all three dataset instances would have required substantially more CPU time than was available for this project. All tables, figures, and conclusions in this report refer to MovieLens 1M unless stated otherwise.
+
+# Methods and Experimental Setup {#sec-methods-and-experimental-setup}
+
+## Embeddings
+
+The methodology consists of two stages. First, dense latent representations are learned from user--movie rating data using an MLP-based embedding model. Second, clustering procedures are applied to those embeddings to determine which combinations of embedding dimension and clustering method yield the strongest grouping structure.
+
+Although the broader experimental design included three dataset instances (MovieLens 1M and two sampled subsets from MovieLens 20M), the full embedding and clustering pipeline described below was ultimately executed and reported only for the MovieLens 1M dataset due to computational constraints. The methodology itself, however, is defined independently of dataset choice and applies identically to all dataset instances.
+
+To generate user embeddings, we first constructed a user--item interaction matrix from the MovieLens 1M dataset. Each row corresponds to a user and each column corresponds to a movie, resulting in an input dimensionality of 3706 (i.e., the total number of unique movies). Since the matrix is sparse, we applied mean-centering by subtracting the average rating of each movie, followed by imputing missing values with zeros. This normalization helps stabilize the input distribution and removes global rating biases across movies.
+
+We then used a fully connected neural network (Multi-Layer Perceptron, MLP) to project the high-dimensional user vectors into a lower-dimensional latent space. The network takes a 3706-dimensional input vector and passes it through a hidden layer of size 512, followed by a non-linear activation (Sigmoid). A second linear layer maps this representation to a compact embedding space. We experimented with multiple embedding sizes of 64, 128, and 256 to study the effect of representation capacity.
+
+Figure \ref{fig:mlp_architecture} illustrates the architecture of the network used for embedding generation.
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.6\textwidth]{figures/mlp_architecture.png}
+    \caption{MLP architecture for user embedding generation (input: 3706, hidden: 512, output: embedding size).}
+    \label{fig:mlp_architecture}
+\end{figure}
+
+After the embeddings are learned, clustering is performed separately in each embedding space. The four clustering methods considered are K-means, probabilistic distance clustering (PD), reduced K-means (RKM), and factorial probabilistic distance clustering (FPDC). The experimental design applies each method to each embedding dimension in order to compare clustering behavior across both representation size and clustering algorithm.
+
+Clustering is not performed directly on the raw sparse rating matrix. Instead, the embedding model transforms sparse user--item behavior into a lower-dimensional representation on which clustering is applied.
+
+## Clustering Implementation in R
+
+We ran all four clustering analyses in R. Before clustering, we standardized every embedding matrix so that each embedding coordinate contributed on a comparable scale to Euclidean-distance calculations. We cached every fitted model and tuning result to `.rds` files so that we could reproduce tables and figures without rerunning the full pipeline during rendering. As described in the Dataset section, all clustering experiments were conducted on the MovieLens 1M embeddings.
+
+We implemented K-means [@everitt2011cluster] with the `kmeans()` function from the base `stats` package. During tuning, we compared the Hartigan--Wong, Lloyd, and MacQueen algorithmic variants with 10 random starts and a maximum of 100 iterations. The three variants led to the same substantive tuning conclusion: in every embedding dimension, they attained their best silhouette and Calinski-Harabasz values at 2 clusters, and the metric differences between variants were small. We selected MacQueen as the final reported K-means implementation because it provided the strongest overall runtime--quality tradeoff and the cleanest fitting behavior across embeddings. For K-means tuning, we evaluated cluster counts from 2 through 20 so that we could inspect the full within-cluster sum of squares curve. For the cross-method comparison, we used the saved MacQueen models over cluster counts 2 through 8.
+
+We implemented RKM [@desoete1994rkm] with `cluspca()` from the `clustrd` package, using `method = "RKM"` and `rotation = "varimax"`. We jointly tuned the number of clusters $(k \in \{2, \ldots, 10\})$ and the number of retained factors $(q \in \{2, \ldots, 6\})$. RKM estimates both a partition and a lower-dimensional subspace, so each additional retained factor increases computational cost. We selected the final RKM model in each embedding with average silhouette width as the primary criterion and the Calinski-Harabasz index as the secondary criterion.
+
+We implemented PD [@benisrael2008pdclustering] with `PDC()` from the `FPDclustering` package [@tortora2024fpdclustering]. For each embedding dimension, we evaluated candidate cluster counts from 2 through 10. PD does not estimate an additional reduced subspace, so it remained computationally inexpensive relative to RKM and FPDC and therefore supported a broader cluster-count search. We selected the final PD model in each embedding with probability silhouette as the primary criterion, ordinary silhouette as the secondary criterion, and the Calinski-Harabasz index as the tertiary criterion.
+
+FPDC [@tortora2016fpdc] was implemented using `FPDC()` from the `FPDclustering` package [@tortora2024fpdclustering]. Models were fit over the grid $k \in \{2, \ldots, 8\}$ and $q \in \{2, \ldots, 5\}$, using 20 internal iterations and tuning parameters $\nu = 6$ and $\nu = 10$. Preliminary runs with $\nu = 2$ produced highly inconsistent solutions and were therefore excluded from the final reported analysis. We selected the best FPDC model per embedding using probability silhouette as the primary criterion, ordinary silhouette as the secondary criterion, and the Calinski-Harabasz index as the tertiary criterion.
+
+# Test Setup and Evaluation {#sec-evaluation-framework}
+
+Because the analysis has no ground-truth labels, we evaluated the clustering results with internal validation metrics, bootstrap stability, partition agreement, empirical runtime, and interpretability rather than external criteria.
+
+## Internal Validation Metrics
+
+We used **average silhouette** [@kaufman1990finding] width as the main hard-clustering diagnostic for K-means and RKM. Silhouette width measures how much closer each user lies to its assigned cluster than to the nearest competing cluster, so larger values indicate better-separated and more coherent clusters. We used the **Calinski-Harabasz** (CH) index as a second hard-clustering diagnostic because it rewards high between-cluster dispersion and low within-cluster dispersion.
+
+For PD and FPDC, we also computed probability silhouette with `Silh()` from the `FPDclustering` package [@tortora2024fpdclustering]. Probability silhouette respects soft memberships and therefore aligns more closely with the probabilistic objective than ordinary silhouette alone. We still report ordinary silhouette and the Calinski-Harabasz index for those methods so that we can compare the soft-clustering methods with the hard-clustering methods on a common scale.
+
+For K-means, we also reported total within-cluster sum of squares because it directly reflects the K-means objective. We used the within-cluster sum of squares curve as the primary K-means tuning diagnostic and extracted the elbow from the saved fitted models. Because within-cluster sum of squares decreases monotonically as the number of clusters increases, we interpreted the elbow as a method-specific structural diagnostic rather than as a measure of cluster separation.
+
+We selected each method with a **method-specific hierarchy** of criteria shown in Table \label{tab:tuning-summary}.
+
+\begin{table}[htbp]
+\centering
+\small
+\caption{Tuning ranges and model-selection rules for each clustering method.}
+\label{tab:tuning-summary}{
+\begin{tabular}{llllll}
+\toprule
+Method & k range & q range & $1^{st}$ criterion & $2^{nd}$ criterion & $3^{rd}$ criterion \\
+\midrule
+KM & 2--20 & -- &  WSS elbow diagnostic & Avg. silh. width & CH \\
+RKM & 2--10 & 2--6 & Avg. silh. width for all (k,q) combinations & CH & Stability \\
+PD & 2--5 & -- & Probability silh. & Avg. silh. width & CH \\
+FPDC & 2--8 & 2--5 & Probability silh. for all (k,q, $\nu$) combinations &  silh. width & CH index \\
+\bottomrule
+\end{tabular}
+}
+\end{table}
+
+
+## Stability
+
+We assessed bootstrap stability with 15 bootstrap replicates for each combination of method, embedding dimension, and cluster count [@everitt2011cluster]. In each replicate, we sampled 30\% of users with replacement, refit the clustering model on the bootstrap sample, and compared the resulting partition with the full-data reference partition by adjusted Rand index (ARI) [@kaufman1990finding]. Adjusted Rand index ranges from 0 for chance-level agreement to 1 for perfect agreement, so larger values indicate more reproducible solutions. For PD and FPDC, we converted soft memberships to hard labels by assigning each user to the cluster with the highest membership probability before computing adjusted Rand index.
+
+We also compared the final partitions across methods with pairwise adjusted Rand indices computed within matched embedding dimensions and matched cluster counts. This comparison tells us whether different methods recover the same underlying structure or fundamentally different partitions.
+
+## Runtime and Computational Cost
+
+We recorded wall-clock runtime for every cached model fit and used runtime as an empirical measure of computational complexity. K-means and PD mainly scale with repeated distance calculations between users and cluster centers, so they remain comparatively fast. RKM adds the cost of estimating and rotating a lower-dimensional subspace. FPDC adds both subspace estimation and iterative soft-membership updates, and it also tunes $\nu$. We therefore interpreted runtime jointly with fit quality: a more complex method should deliver a clear gain in clustering quality if it is going to justify higher computational cost.
+
+## Implementation Summary
+
+Table \ref{tab:tuning-summary} summarizes the tuning grids and selection rules. The methods use different parameter ranges because they solve different optimization problems and incur different computational costs. K-means only tunes the number of clusters, so it can support a broad cluster-count range and a full elbow diagnostic. RKM and FPDC tune both cluster counts and retained factors, so their search grids grow much more quickly. FPDC also tunes $\nu$, which further expands the search space. The Tucker-factor diagnostics increased smoothly with the number of retained factors and did not show a sharp elbow, so we treated large retained-factor values as offering only incremental gains. That pattern justified a slightly broader retained-factor range for RKM and a more compact retained-factor range for FPDC.
+
+All methods were applied to standardized embedding matrices of dimensions 64, 128, and 256. For K-means, WSS elbow plots were used as a method-specific tuning diagnostic, and the final value of $k$ was determined using silhouette width, the Calinski-Harabasz index, and bootstrap stability when the elbow was weak or ambiguous. For RKM, $k$ and the reduced dimension $q$ were selected jointly over a two-dimensional grid using silhouette as the primary criterion and CH as a secondary check. For the probabilistic methods, model selection emphasized probability silhouette because PD and FPDC produce soft cluster memberships. Accordingly, PD models were selected over $k$ using probability silhouette as the primary criterion, with ordinary silhouette and CH used as supporting diagnostics, while FPDC models were selected over $(k, q, \nu)$ using the same hierarchy. Intermediate results were cached to R Data Serialization or `.rds` files to support reproducibility without rerunning the full pipeline during rendering. The tuning ranges and selection criteria for each method are summarized in Table \ref{tab:tuning-summary}.
+
+# Results {#sec-results}
+
+This section compares clustering performance across embedding dimensions and methods
+using the pre-specified method-specific tuning criteria, with average silhouette width,
+the Calinski-Harabasz (CH) index, runtime, and bootstrap stability used to interpret
+the selected solutions.
+
+\begin{table}[htbp]
+\centering
+\small
+\caption{Best clustering result for each method and embedding dimension under the pre-specified method-specific selection criteria. Runtime is reported in seconds.}
+\label{tab-best-models}
+\begin{tabular}{llrrrrrrr}
+\toprule
+Method & Embedding & Clusters & Factors & $\nu$ & Runtime & Silhouette & CH index & Prob.\ silh. \\
+\midrule
+K-means & 64  & 4 & --- & --- & 7.35  & -0.011 & 96.96  & --- \\
+PD & 64  & 2 & --- & --- & 0.29  & 0.003  & 10.14  & 0.093 \\
+RKM & 64  & 2 & 2 & --- & 278.90 & 0.235 & 132.29 & --- \\
+FPDC & 64  & 2 & 4 & 6  & 241.74 & 0.012 & 70.55  & 0.143 \\
+K-means & 128 & 4 & --- & --- & 12.72 & -0.010 & 91.21  & --- \\
+PD & 128 & 2 & --- & --- & 0.18  & 0.000  & 0.92   & 0.068 \\
+RKM & 128 & 2 & 4 & --- & 184.10 & 0.331 & 139.52 & --- \\
+FPDC & 128 & 4 & 2 & 6  & 188.16 & -0.115 & 56.43 & 0.136 \\
+K-means & 256 & 4 & --- & --- & 23.45 & 0.026  & 74.77  & --- \\
+PD & 256 & 2 & --- & --- & 0.26  & 0.000  & 1.07   & 0.062 \\
+RKM & 256 & 2 & 5 & --- & 257.64 & 0.290 & 111.25 & --- \\
+FPDC & 256 & 6 & 3 & 10 & 70.74 & -0.209 & 33.92 & 0.148 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Table \ref{tab-best-models} reports the final selected model for each method and
+embedding dimension under the pre-specified method-specific tuning rules. Under these
+rules, RKM produced the strongest overall hard partitions. The best overall
+solution used the 128-dimensional embeddings, 2 clusters, and 4 retained factors, and
+it achieved an average silhouette width of 0.331 and a Calinski-Harabasz index of
+139.52. The 256-dimensional RKM model followed with 2 clusters and 5
+retained factors, silhouette 0.290, and Calinski-Harabasz index 111.25. The
+64-dimensional RKM model selected 2 clusters and 2 retained factors and
+achieved silhouette 0.235 and Calinski-Harabasz index 132.29.
+
+K-means behaved differently under the revised selection rules because we prioritized
+the within-cluster sum of squares elbow diagnostic. The elbow diagnostic selected 4
+clusters in all three embedding dimensions. Those selected K-means solutions achieved
+silhouettes of -0.011, -0.010, and 0.026 in the 64-, 128-, and 256-dimensional
+embeddings, respectively. These values are much lower than the corresponding
+two-cluster silhouette values, which means the elbow-based K-means rule favored a more
+complex partition than the silhouette-based rule would have favored. This contrast is
+important: under the revised method-specific criteria, K-means no longer provides the
+strongest selected solution.
+
+Figure \ref{fig-best-silhouette-by-method} summarizes the best selected silhouette
+value for each method and embedding dimension. The figure shows that the
+128-dimensional embeddings still provide the clearest overall structure, but the
+selected winner now depends on the tuning rule attached to each method. RKM dominates K-means under the revised criteria because RKM directly
+selects its best model by silhouette, while K-means now selects its model by the elbow
+diagnostic. The 64-dimensional embeddings appear too compressed to capture the full
+geometry of user preferences, while the 256-dimensional embeddings retain useful
+structure but do not surpass the 128-dimensional representations.
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.88\textwidth]{figures/figure3_best_silhouette_by_method_embedding.png}
+    \caption{Best selected silhouette value by method and embedding dimension under the pre-specified method-specific tuning rules.}
+    \label{fig-best-silhouette-by-method}
+\end{figure}
+
+Figure \ref{fig-runtime-tradeoff} compares runtime and clustering quality for the
+final selected models. PD ran fastest in every embedding dimension, with runtimes
+between 0.18 and 0.29 seconds, but it produced ordinary silhouette values at or near
+zero. K-means ran much faster than RKM and FPDC, with selected-model runtimes of 7.35,
+12.72, and 23.45 seconds, but the elbow-selected K-means models did not produce strong
+hard partitions. RKM required 184.10 to 278.90 seconds because it jointly estimated a
+partition and a lower-dimensional subspace. FPDC required 70.74 to 241.74 seconds for
+the selected models and still produced weak or negative ordinary silhouettes. In
+practical terms, RKM delivered the best hard-clustering quality, but it did so at
+substantially higher computational cost than K-means or PD.
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.88\textwidth]{figures/figure3_runtime_vs_silhouette.png}
+    \caption{Runtime and clustering quality for the final selected models.}
+    \label{fig-runtime-tradeoff}
+\end{figure}
+
+Figure \ref{fig-runtime-tradeoff} therefore serves as an empirical complexity summary:
+methods with larger tuning grids and more expensive updates move to the right, and only
+RKM shows a clear quality gain that partly justifies that extra cost.
+
+PD selected 2 clusters in all three embedding dimensions because probability silhouette
+favored that solution throughout the PD grid. Even so, the selected PD models remained
+weak: the ordinary silhouette values were 0.003, 0.000, and 0.000 in the 64-, 128-, and
+256-dimensional embeddings, and the probability silhouettes were only 0.093, 0.068,
+and 0.062. These results indicate that PD did not recover a strong hard partition in
+the learned user embeddings.
+
+FPDC performed better than PD on the probability-silhouette criterion, but it still did
+not recover competitive hard partitions. In the 64-dimensional embedding, FPDC selected
+2 clusters, 4 retained factors, and $\nu=6$, with probability silhouette 0.143 and
+ordinary silhouette 0.012. In the 128-dimensional embedding, FPDC selected 4 clusters,
+2 retained factors, and $\nu=6$, with probability silhouette 0.136 and ordinary
+silhouette -0.115. In the 256-dimensional embedding, FPDC selected 6 clusters, 3
+retained factors, and $\nu=10$, with probability silhouette 0.148 and ordinary
+silhouette -0.209. FPDC therefore improved the soft-membership diagnostic relative to
+PD, but that improvement did not translate into a strong hard partition.
+
+Figure \ref{fig-ari-method-pairs} compares the final partitions across methods with
+average adjusted Rand index. K-means and RKM still show by far the strongest agreement,
+with average adjusted Rand index 0.586. This result indicates that both methods recover
+a closely related underlying structure, even though the revised K-means selection rule
+now reports 4 clusters. Method pairs involving PD or FPDC show much weaker agreement.
+FPDC versus RKM averages 0.061, FPDC versus K-means averages 0.060, FPDC versus PD
+averages 0.007, and both K-means versus PD and RKM versus PD average 0.001. These low
+values indicate that the probabilistic methods recovered fundamentally different and
+much less stable partitions.
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.85\textwidth]{figures/figure4_average_ari_by_method_pair.png}
+    \caption{Average adjusted Rand index by method pair. Higher values indicate stronger agreement between partitions recovered by different clustering methods.}
+    \label{fig-ari-method-pairs}
+\end{figure}
+
+# Conclusion and Future Work {#sec-conclusion-and-future-work}
+
+This study evaluated clustering structure in user embeddings learned from the MovieLens 1M dataset across multiple embedding dimensions and clustering methods. Overall, the results provide only modest evidence of clustering structure in the learned representations. None of the methods produced uniformly strong results across evaluation criteria, and several selected solutions exhibited weak separation or poor reproducibility.
+
+Among the methods considered, RKM produced the strongest and most consistent hard-clustering results. Its best solution, obtained in the 128-dimensional embedding space with 2 clusters and 4 retained factors, achieved the highest silhouette and strong Calinski-Harabasz values. K-means produced closely related partitions, as shown by high agreement with RKM, but its conclusions depended strongly on the tuning rule. In particular, the within-cluster sum of squares elbow diagnostic favored 4-cluster solutions with substantially weaker separation than the corresponding 2-cluster solutions. This sensitivity weakens the interpretability of K-means as a standalone method in this setting.
+
+The probabilistic methods (PD and FPDC) provided less convincing results. PD consistently selected 2 clusters but produced near-zero silhouette values and showed little bootstrap stability. FPDC improved the probability-silhouette criterion relative to PD, but this improvement did not translate into meaningful hard partitions. FPDC solutions often exhibited negative silhouette values, low agreement with K-means and RKM, and higher computational cost. Sensitivity to the tuning parameter $\nu$ further complicated interpretation, as improvements in the soft objective could coincide with degradation in hard-clustering quality.
+
+These results suggest that the learned user embeddings contain limited and weakly separated cluster structure. The consistent selection of two-cluster solutions by the strongest-performing methods indicates that the dominant signal in the embedding space may reflect a coarse global split in user behavior, rather than multiple well-defined and sharply separated groups. At the same time, the relatively low silhouette values and instability of alternative solutions indicate that this structure is not strongly pronounced.
+
+Embedding dimension played an important role in revealing this structure. The 128-dimensional embeddings provided the clearest and most stable clustering behavior, while the 64-dimensional embeddings appeared to compress the data too aggressively, and the 256-dimensional embeddings did not improve separation further. This pattern suggests a trade-off between representation capacity and noise: too few dimensions obscure structure, while too many may retain variability that does not correspond to cluster separation.
+
+Taken together, the results support a cautious interpretation. Embedding-based representations of user behavior can reveal some clustering tendency, but the resulting partitions are weak, low-dimensional, and sensitive to modeling choices. The findings do not support a strong claim that user preferences in this dataset form clearly separable, high-quality clusters.
+
+Future work should explore alternative clustering approaches that may be better suited to this type of data. In particular, spectral clustering could capture non-spherical structure, Gaussian mixture models could model overlapping elliptical groups, and density-based methods such as DBSCAN or HDBSCAN could detect small dense regions within a diffuse background. For recommender-system embeddings, it may also be useful to examine graph-based community detection methods or clustering approaches that explicitly account for sparsity and uncertainty in user behavior.
+
+A natural extension would be to combine these clustering methods with richer representation learning approaches, such as autoencoders, matrix factorization, or graph neural network embeddings, and to evaluate whether improved representations lead to more stable, better-separated, and more interpretable user segments.
+
+# Appendix {#sec-appendix}
+
+The code used to reproduce all analyses, figures, and tables in this report is available at: \url{https://github.com/syedalijabir/math252-project}
+
+## Additional tuning diagnostics
+
+```{r fig-rkm-sensitivity, fig.cap="Reduced K-means silhouette values across candidate k and q settings.", include=FALSE}
+plot_rkm_sensitivity(plot_df)
+```
+
+
+
+```{r tbl-ari-summary, include=FALSE}
+## Agreement summary table
+knitr::kable(
+  format_ari_summary_table(ari_summary),
+  booktabs = TRUE,
+  caption = "Summary of pairwise adjusted Rand index values across method pairs."
+)
+```
+
+
+<!-- \begin{figure}[htbp]
+    \centering
+    \includegraphics[width=\textwidth]{figures/figure1_kmeans_macqueen_silhouette_vs_k.pdf}
+    \caption{Average silhouette width across candidate cluster counts for MacQueen K-means. Silhouette peaks at 2 clusters in all three embedding dimensions, even though the elbow diagnostic selects 4 clusters.}
+    \label{fig:kmeans-silhouette-k}
+\end{figure} -->
+
+
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=\textwidth]{figures/appendix_figureA1_kmeans_wss_vs_k_cleaned.png}
+    \caption{Within-cluster sum of squares for MacQueen K-means across candidate cluster counts. The elbow diagnostic selects 4 clusters in all three embedding dimensions.}
+    \label{fig:kmeans-wss-appendix}
+\end{figure}
+
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=\textwidth]{figures/appendix_figureA2_rkm_silhouette_vs_k_nf.png}
+    \caption{Reduced K-means silhouette values across candidate cluster counts and retained-factor settings. The strongest region lies at 3 clusters if we look at the elbow technique, and 2 clusters if we use average silhouette width alone.}
+    \label{fig:rkm-grid-appendix}
+\end{figure}
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=\textwidth]{figures/appendix_figureA3_probability_silhouette_pd_fpdc.png}
+    \caption{Best probability silhouette across candidate cluster counts for PD clustering and FPDC. FPDC improves the soft-membership diagnostic relative to PD, but it still does not produce a strong hard partition.}
+    \label{fig:prob-silhouette-appendix}
+\end{figure}
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=\textwidth]{figures/kmeans-stability.png}
+    \caption{Bootstrap stability for K-means across embedding dimensions and cluster counts.}
+    \label{fig:kmeans-stability}
+\end{figure}
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=\textwidth]{figures/rkm-stability.png}
+    \caption{Bootstrap stability for Reduced K-means across embedding dimensions and cluster counts.}
+    \label{fig:rkm-stability}
+\end{figure}
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=\textwidth]{figures/pd-stability.png}
+    \caption{Bootstrap stability for PD clustering across embedding dimensions and cluster counts.}
+    \label{fig:pd-stability}
+\end{figure}
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=\textwidth]{figures/fpdc-stability.png}
+    \caption{Bootstrap stability for FPDC across embedding dimensions and cluster counts.}
+    \label{fig:fpdc-stability}
+\end{figure}
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.78\textwidth]{figures/TuckerFactor.png}
+    \caption{Tucker-factor diagnostic for the learned embeddings. The diagnostic increases smoothly as the number of retained factors grows and does not show a sharp elbow, which supports a compact retained-factor search range.}
+    \label{fig:tucker-factor}
+\end{figure}
+
+
+\begin{table}[htbp]
+\centering
+\small
+\caption{FPDC sensitivity to the tuning parameter \(\nu\). Each row reports the best FPDC model within a fixed \(\nu\) value after excluding the inconsistent \(\nu=2\) pilot runs.}
+\label{tab:fpdc-nu-sensitivity}
+\resizebox{\textwidth}{!}{
+\begin{tabular}{rrrrrrrr}
+\toprule
+Embedding dimension & \(\nu\) & Clusters & Retained factors & Runtime (s) & Average Silhouette Width & Calinski--Harabasz index & Probability Silhouette \\
+\midrule
+64  & 6  & 2 & 4 & 241.74 & 0.012  & 70.55 & 0.143 \\
+64  & 10 & 2 & 4 & 77.76  & 0.012  & 69.93 & 0.143 \\
+128 & 6  & 4 & 2 & 188.16 & -0.115 & 56.43 & 0.136 \\
+128 & 10 & 4 & 2 & 69.08  & -0.115 & 56.59 & 0.136 \\
+256 & 6  & 3 & 2 & 170.20 & -0.056 & 63.41 & 0.146 \\
+256 & 10 & 6 & 3 & 70.74  & -0.209 & 33.92 & 0.148 \\
+\bottomrule
+\end{tabular}
+}
+\end{table}
+
+
+
+
+
+
