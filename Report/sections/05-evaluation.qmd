@@ -12,7 +12,7 @@ For K-means, we also reported total within-cluster sum of squares because it dir
 
 We selected each method with a **method-specific hierarchy** of criteria shown in Table \ref{tbl-tuning-summary}.
 
-\begin{table}[htbp]
+\begin{table}
 \centering
 \small
 \caption{Tuning ranges and model-selection rules for each clustering method.}

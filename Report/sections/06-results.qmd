@@ -5,7 +5,7 @@ using the pre-specified method-specific tuning criteria, with average silhouette
 the CH index, runtime, and bootstrap stability used to interpret
 the selected solutions.
 
-\begin{table}[htbp]
+\begin{table}
 \centering
 \small
 \caption{Best clustering result for each method and embedding dimension under the pre-specified method-specific selection criteria. Runtime is reported in seconds.}
@@ -59,7 +59,7 @@ diagnostic. The 64-dimensional embeddings appear too compressed to capture the f
 geometry of user preferences, while the 256-dimensional embeddings retain useful
 structure but do not surpass the 128-dimensional representations.
 
-\begin{figure}[htbp]
+\begin{figure}
     \centering
     \includegraphics[width=0.8\textwidth]{figures/figure3_best_silhouette_by_method_embedding.png}
     \caption{Best selected silhouette value by method and embedding dimension under the pre-specified method-specific tuning rules.}
@@ -77,7 +77,7 @@ the selected models and still produced weak or negative ordinary silhouettes. In
 practical terms, RKM delivered the best hard-clustering quality, but it did so at
 substantially higher computational cost than K-means or PD.
 
-\begin{figure}[htbp]
+\begin{figure}
     \centering
     \includegraphics[width=0.8\textwidth]{figures/figure3_runtime_vs_silhouette.png}
     \caption{Runtime and clustering quality for the final selected models.}
@@ -115,7 +115,7 @@ averages 0.007, and both K-means versus PD and RKM versus PD average 0.001. Thes
 values indicate that the probabilistic methods recovered fundamentally different and
 much less stable partitions.
 
-\begin{figure}[htbp]
+\begin{figure}
     \centering
     \includegraphics[width=0.8\textwidth]{figures/figure4_average_ari_by_method_pair.png}
     \caption{Average ARI by method pair. Higher values indicate stronger agreement between partitions recovered by different clustering methods.}
