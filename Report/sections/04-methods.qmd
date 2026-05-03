@@ -14,7 +14,7 @@ Figure \ref{fig-mlp_architecture} illustrates the architecture of the network us
 
 \begin{figure}[h]
     \centering
-    \includegraphics[width=0.6\textwidth]{figures/mlp_architecture.png}
+    \includegraphics[width=0.5\textwidth]{figures/mlp_architecture.png}
     \caption{MLP architecture for user embedding generation (input: 3706, hidden: 512, output: embedding size).}
     \label{fig-mlp_architecture}
 \end{figure}

@@ -34,7 +34,7 @@ FPDC & 2--8 & 2--5 & Probability silhouette for all (k,q, $\nu$) combinations & 
 
 ## Stability
 
-We assessed bootstrap stability with 15 bootstrap replicates for each combination of method, embedding dimension, and cluster count [@everitt2011cluster]. In each replicate, we sampled 30\% of users with replacement, refit the clustering model on the bootstrap sample, and compared the resulting partition with the full-data reference partition by adjusted Rand index (ARI) [@kaufman1990finding]. Adjusted Rand index ranges from 0 for chance-level agreement to 1 for perfect agreement, so larger values indicate more reproducible solutions. For PD and FPDC, we converted soft memberships to hard labels by assigning each user to the cluster with the highest membership probability before computing adjusted Rand index.
+We assessed bootstrap stability with 15 bootstrap replicates for each combination of method, embedding dimension, and cluster count [@everitt2011cluster]. In each replicate, we sampled 30\% of users with replacement, refit the clustering model on the bootstrap sample, and compared the resulting partition with the full-data reference partition by **adjusted Rand index (ARI)** [@kaufman1990finding]. ARI ranges from 0 for chance-level agreement to 1 for perfect agreement, so larger values indicate more reproducible solutions. For PD and FPDC, we converted soft memberships to hard labels by assigning each user to the cluster with the highest membership probability before computing ARI.
 
 We also compared the final partitions across methods with pairwise adjusted Rand indices computed within matched embedding dimensions and matched cluster counts. This comparison tells us whether different methods recover the same underlying structure or fundamentally different partitions.
 
@@ -44,10 +44,17 @@ We recorded wall-clock runtime for every cached model fit and used runtime as an
 
 ## Implementation Summary
 
-Table \ref{tbl-tuning-summary} summarizes the tuning grids and selection rules. The methods use different parameter ranges because they solve different optimization problems and incur different computational costs. K-means only tunes the number of clusters, so it can support a broad cluster-count range and a full elbow diagnostic. RKM and FPDC tune both cluster counts and retained factors, so their search grids grow much more quickly. FPDC also tunes $\nu$, which further expands the search space. The Tucker-factor diagnostics increased smoothly with the number of retained factors and did not show a sharp elbow, so we treated large retained-factor values as offering only incremental gains. That pattern justified a slightly broader retained-factor range for RKM and a more compact retained-factor range for FPDC.
+Table \ref{tbl-tuning-summary} summarizes the parameter search grids and model-selection
+rules for each clustering method. The methods differ in how many parameters must be specified: K-means
+requires only the number of clusters $k$, which allows a broad search range and a full WSS
+elbow diagnostic. RKM requires both $k$ and the number of retained factors $q$, so the
+search grid grows more quickly. FPDC additionally requires $\nu$, which further expands the
+parameter space and motivated a more compact retained-factor range relative to RKM. The
+Tucker-factor (See Appendix Figure \ref{fig-tucker-factor}) diagnostic increased smoothly with the number of retained factors and did not
+show a sharp elbow, which confirmed that large retained-factor values offered only incremental
+gains.
 
-All methods were applied to standardized embedding matrices of dimensions 64, 128, and 256. For K-means, WSS elbow plots were used as a method-specific tuning diagnostic, and the final value of $k$ was determined using silhouette width, the CH index, and bootstrap stability when the elbow was weak or ambiguous. For RKM, $k$ and the reduced dimension $q$ were selected jointly over a two-dimensional grid using silhouette as the primary criterion and CH as a secondary check. For the probabilistic methods, model selection emphasized probability silhouette because PD and FPDC produce soft cluster memberships. Accordingly, PD models were selected over $k$ using probability silhouette as the primary criterion, with ordinary silhouette and CH used as supporting diagnostics, while FPDC models were selected over $(k, q, \nu)$ using the same hierarchy. Intermediate results were cached to R Data Serialization or `.rds` files to support reproducibility without rerunning the full pipeline during rendering. The tuning ranges and selection criteria for each method are summarized in Table \ref{tbl-tuning-summary}.
-
+All methods were applied to standardized embedding matrices of dimensions 64, 128, and 256. For K-means, WSS elbow plots were used as a method-specific tuning diagnostic, and the final value of $k$ was determined using silhouette width, the CH index, and bootstrap stability when the elbow was weak or ambiguous. For RKM, $k$ and the reduced dimension $q$ were selected jointly over a two-dimensional grid using silhouette as the primary criterion and CH as a secondary check. For the probabilistic methods, model selection emphasized probability silhouette because PD and FPDC produce soft cluster memberships. Accordingly, PD models were selected over $k$ using probability silhouette as the primary criterion, with ordinary silhouette and CH used as supporting diagnostics, while FPDC models were selected over $(k, q, \nu)$ using the same hierarchy. Intermediate results were cached to R Data Serialization or `.rds` files to support reproducibility without rerunning the full pipeline during rendering.
 
 
 

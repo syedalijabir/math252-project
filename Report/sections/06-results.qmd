@@ -61,7 +61,7 @@ structure but do not surpass the 128-dimensional representations.
 
 \begin{figure}[htbp]
     \centering
-    \includegraphics[width=0.88\textwidth]{figures/figure3_best_silhouette_by_method_embedding.png}
+    \includegraphics[width=0.8\textwidth]{figures/figure3_best_silhouette_by_method_embedding.png}
     \caption{Best selected silhouette value by method and embedding dimension under the pre-specified method-specific tuning rules.}
     \label{fig-best-silhouette-by-method}
 \end{figure}
@@ -79,7 +79,7 @@ substantially higher computational cost than K-means or PD.
 
 \begin{figure}[htbp]
     \centering
-    \includegraphics[width=0.88\textwidth]{figures/figure3_runtime_vs_silhouette.png}
+    \includegraphics[width=0.8\textwidth]{figures/figure3_runtime_vs_silhouette.png}
     \caption{Runtime and clustering quality for the final selected models.}
     \label{fig-runtime-tradeoff}
 \end{figure}
@@ -106,8 +106,8 @@ silhouette -0.209. FPDC therefore improved the soft-membership diagnostic relati
 PD, but that improvement did not translate into a strong hard partition.
 
 Figure \ref{fig-ari-method-pairs} compares the final partitions across methods with
-average adjusted Rand index. K-means and RKM still show by far the strongest agreement,
-with average adjusted Rand index 0.586. This result indicates that both methods recover
+average ARI. K-means and RKM still show by far the strongest agreement,
+with average ARI 0.586. This result indicates that both methods recover
 a closely related underlying structure, even though the revised K-means selection rule
 now reports 4 clusters. Method pairs involving PD or FPDC show much weaker agreement.
 FPDC versus RKM averages 0.061, FPDC versus K-means averages 0.060, FPDC versus PD
@@ -117,7 +117,49 @@ much less stable partitions.
 
 \begin{figure}[htbp]
     \centering
-    \includegraphics[width=0.85\textwidth]{figures/figure4_average_ari_by_method_pair.png}
-    \caption{Average adjusted Rand index by method pair. Higher values indicate stronger agreement between partitions recovered by different clustering methods.}
+    \includegraphics[width=0.8\textwidth]{figures/figure4_average_ari_by_method_pair.png}
+    \caption{Average ARI by method pair. Higher values indicate stronger agreement between partitions recovered by different clustering methods.}
     \label{fig-ari-method-pairs}
 \end{figure}
+
+## Stability Analysis {#sec-stability}
+
+K-means and RKM are the only methods that produce clearly reproducible partitions.
+Across embedding dimensions, both methods show their highest mean bootstrap ARI at
+2 clusters, with stability weakening as the number of clusters increases. This pattern
+is especially consistent for RKM and supports the final two-cluster RKM solutions. For
+K-means, the stability results favor 2 clusters, which contrasts with the elbow-based
+selection of 4 clusters and highlights the sensitivity of K-means to the chosen tuning
+criterion.
+
+PD and FPDC do not exhibit comparable reproducibility. PD maintains mean bootstrap
+ARI values near zero across almost all settings, which indicates that its partitions are
+not stable under resampling. FPDC shows slightly positive stability in some settings,
+but the values remain low and inconsistent. Occasional local increases around 3
+clusters are not large enough to provide evidence of a reliable partition.
+
+Overall, the stability analysis reinforces the earlier results: only RKM and K-means
+recover a reproducible structure for two clusters, while PD and FPDC yield unstable
+partitions. Bootstrap stability plots of mean ARI across clustering method, embedding
+dimension, and number of clusters are provided in Appendix @sec-appendix Figure \ref{fig-stability}.
+
+## FPDC Sensitivity to the Tuning Parameter $\nu$ {#sec-fpdc-nu}
+
+We evaluated FPDC at $\nu = 2$, $\nu = 6$, and $\nu = 10$. Pilot runs with $\nu = 2$
+produced highly inconsistent solutions and did not improve either probability silhouette
+or ordinary silhouette beyond chance-like behavior, so we excluded $\nu = 2$ from the
+final sensitivity summary. Table @tbl-fpdc-nu-sensitivity reports the best FPDC result
+within each retained $\nu$ value for each embedding dimension.
+
+The 64-dimensional embedding changed very little between $\nu = 6$ and $\nu = 10$.
+Both settings selected 2 clusters and 4 retained factors, and both produced probability
+silhouette 0.143 with ordinary silhouette about 0.012. The 128-dimensional embedding
+also changed very little between $\nu = 6$ and $\nu = 10$. Both settings selected 4
+clusters and 2 retained factors, and both produced probability silhouette near 0.136
+with negative ordinary silhouette. The 256-dimensional embedding showed the clearest
+difference. There, $\nu = 6$ selected 3 clusters and 2 retained factors, with probability
+silhouette 0.146, ordinary silhouette -0.056, and Calinski-Harabasz index 63.41. By
+contrast, $\nu = 10$ selected 6 clusters and 3 retained factors, with slightly higher
+probability silhouette 0.148 but much worse ordinary silhouette -0.209 and a lower
+Calinski-Harabasz index of 33.92. In this dataset, increasing $\nu$ could improve
+FPDC’s soft-membership objective while degrading the corresponding hard partition.

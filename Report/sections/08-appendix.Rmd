@@ -51,33 +51,41 @@ knitr::kable(
     \label{fig:prob-silhouette-appendix}
 \end{figure}
 
+
 \begin{figure}[htbp]
     \centering
-    \includegraphics[width=\textwidth]{figures/kmeans-stability.png}
-    \caption{Bootstrap stability for K-means across embedding dimensions and cluster counts.}
+    \includegraphics[width=\textwidth]{figures/stability_all_embeddings_by_method}
+    \caption{Bootstrap stability for all methods, embedding dimensions, and cluster counts.}
     \label{fig:kmeans-stability}
 \end{figure}
 
-\begin{figure}[htbp]
-    \centering
-    \includegraphics[width=\textwidth]{figures/rkm-stability.png}
-    \caption{Bootstrap stability for Reduced K-means across embedding dimensions and cluster counts.}
-    \label{fig:rkm-stability}
-\end{figure}
+<!-- \begin{figure}[htbp] -->
+<!--     \centering -->
+<!--     \includegraphics[width=\textwidth]{figures/kmeans-stability.png} -->
+<!--     \caption{Bootstrap stability for K-means across embedding dimensions and cluster counts.} -->
+<!--     \label{fig:kmeans-stability} -->
+<!-- \end{figure} -->
 
-\begin{figure}[htbp]
-    \centering
-    \includegraphics[width=\textwidth]{figures/pd-stability.png}
-    \caption{Bootstrap stability for PD clustering across embedding dimensions and cluster counts.}
-    \label{fig:pd-stability}
-\end{figure}
+<!-- \begin{figure}[htbp] -->
+<!--     \centering -->
+<!--     \includegraphics[width=\textwidth]{figures/rkm-stability.png} -->
+<!--     \caption{Bootstrap stability for Reduced K-means across embedding dimensions and cluster counts.} -->
+<!--     \label{fig:rkm-stability} -->
+<!-- \end{figure} -->
 
-\begin{figure}[htbp]
-    \centering
-    \includegraphics[width=\textwidth]{figures/fpdc-stability.png}
-    \caption{Bootstrap stability for FPDC across embedding dimensions and cluster counts.}
-    \label{fig:fpdc-stability}
-\end{figure}
+<!-- \begin{figure}[htbp] -->
+<!--     \centering -->
+<!--     \includegraphics[width=\textwidth]{figures/pd-stability.png} -->
+<!--     \caption{Bootstrap stability for PD clustering across embedding dimensions and cluster counts.} -->
+<!--     \label{fig:pd-stability} -->
+<!-- \end{figure} -->
+
+<!-- \begin{figure}[htbp] -->
+<!--     \centering -->
+<!--     \includegraphics[width=\textwidth]{figures/fpdc-stability.png} -->
+<!--     \caption{Bootstrap stability for FPDC across embedding dimensions and cluster counts.} -->
+<!--     \label{fig:fpdc-stability} -->
+<!-- \end{figure} -->
 
 \begin{figure}[htbp]
     \centering
