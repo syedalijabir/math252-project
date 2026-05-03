@@ -8,7 +8,6 @@ format:
   revealjs:
     theme: simple
     slide-number: true
-    footer: "Math 252 · Dr. Cristina Tortora · SJSU"
     fig-align: center
     fig-cap-location: bottom
     code-fold: false
@@ -42,9 +41,9 @@ execute:
 **Four Methods**
 
 - K-means
-- Probabilistic Distance (PD)
-- Reduced K-means (RKM)
-- Factorial PD (FPDC)
+- PD Clustering
+- Reduced K-means
+- Factorial PD
 :::
 ::::
 
@@ -62,17 +61,17 @@ Welcome. This project asks whether user behavior in movie ratings forms meaningf
 ::: {.column width="50%"}
 **Hard assignment**
 
-**K-means** — minimizes within-cluster variance; fast and widely used; assumes spherical clusters
+**K-means** 
 
-**Reduced K-means (RKM)** — simultaneously estimates a partition and a low-dimensional subspace; concentrates on clustering-relevant directions
+**Reduced K-means** 
 :::
 
 ::: {.column width="50%"}
 **Probabilistic assignment**
 
-**PD Clustering** — soft memberships based on distance to cluster centers; robust to overlap and noise
+**PD Clustering** 
 
-**Factorial PD (FPDC)** — combines soft clustering with dimension reduction; handles overlap and high dimensionality jointly
+**Factorial PD** 
 :::
 ::::
 
@@ -80,6 +79,11 @@ The four methods differ along two axes: **assignment** (hard vs. probabilistic) 
 
 ::: {.notes}
 The methods form a 2x2 structure. K-means and RKM make hard assignments — every user belongs to exactly one cluster. PD and FPDC make soft assignments — users have partial membership in each cluster. RKM and FPDC additionally reduce dimensionality, which can help when cluster structure is clearer in a subspace than in the full embedding space. These differences have direct implications for robustness, runtime, and interpretability.
+
+— minimizes within-cluster variance; fast and widely used; assumes spherical clusters
+— simultaneously estimates a partition and a low-dimensional subspace; concentrates on clustering-relevant directions
+— soft memberships based on distance to cluster centers; robust to overlap and noise
+— combines soft clustering with dimension reduction; handles overlap and high dimensionality jointly
 :::
 
 ---
@@ -191,13 +195,13 @@ This table shows the final selected model for each method and embedding. RKM row
 
 ![](figures/figure3_best_silhouette_by_method_embedding.png){width=82%}
 
+
+::: {.notes}
+This bar chart makes the ranking clear. RKM (teal) leads at every embedding size. The 128-dimensional embeddings give the highest bars overall. K-means orange bars are near zero because the elbow selected 4 clusters — if we used silhouette to select k for K-means it would look much more similar to RKM. PD green bars are barely visible. FPDC purple bars are sometimes negative for the 128 and 256 dimensional cases.
 - **RKM dominates** across all three embedding sizes
 - 128-dimensional embeddings provide the strongest signal
 - PD and FPDC produce near-zero or negative silhouettes
 - K-means is competitive only under silhouette-based selection
-
-::: {.notes}
-This bar chart makes the ranking clear. RKM (teal) leads at every embedding size. The 128-dimensional embeddings give the highest bars overall. K-means orange bars are near zero because the elbow selected 4 clusters — if we used silhouette to select k for K-means it would look much more similar to RKM. PD green bars are barely visible. FPDC purple bars are sometimes negative for the 128 and 256 dimensional cases.
 :::
 
 ---
@@ -206,13 +210,14 @@ This bar chart makes the ranking clear. RKM (teal) leads at every embedding size
 
 ![](figures/figure3_runtime_vs_silhouette.png){width=78%}
 
+
+
+::: {.notes}
+This scatter plot has runtime on the log x-axis and silhouette on the y-axis. The ideal position is top-left — high quality at low cost. PD is bottom-left: cheap but useless for hard partitions. K-means is middle-left. RKM is middle-right: it costs more but earns it with silhouette around 0.3. FPDC is bottom-right: the worst of both worlds for hard partitions, though it does better on probability silhouette which is not shown here.
 - **PD:** fastest, but silhouette ≈ 0 — fast and uninformative
 - **K-means:** fast and reasonable quality under silhouette selection
 - **RKM:** higher cost, but the only method with strong silhouette
 - **FPDC:** highest cost, weakest hard-partition quality
-
-::: {.notes}
-This scatter plot has runtime on the log x-axis and silhouette on the y-axis. The ideal position is top-left — high quality at low cost. PD is bottom-left: cheap but useless for hard partitions. K-means is middle-left. RKM is middle-right: it costs more but earns it with silhouette around 0.3. FPDC is bottom-right: the worst of both worlds for hard partitions, though it does better on probability silhouette which is not shown here.
 :::
 
 ---
@@ -221,52 +226,24 @@ This scatter plot has runtime on the log x-axis and silhouette on the y-axis. Th
 
 ![](figures/figure4_average_ari_by_method_pair.png){width=75%}
 
-- **K-means vs RKM: ARI = 0.586** — both recover the same structure
-- All pairs involving PD or FPDC: ARI < 0.10
-- Probabilistic methods find fundamentally different partitions
+
 
 ::: {.notes}
 This bar chart shows pairwise ARI between methods. K-means and RKM agree strongly — average ARI of 0.586 with a max of 0.988 — meaning they find essentially the same underlying two-group partition despite their different formulations. Everything involving PD or FPDC is near zero, confirming those methods are finding something completely different — and given their near-zero silhouettes, likely just noise rather than real structure.
+- **K-means vs RKM: ARI = 0.586** — both recover the same structure
+- All pairs involving PD or FPDC: ARI < 0.10
+- Probabilistic methods find fundamentally different partitions
 :::
 
 ---
 
 ## Bootstrap Stability
 
-![](figures/figures/all-methods-stability.png){width=88%}
+![](figures/stability_all_methods_by_embedding.png){width=88%}
 
 ::: {.notes}
 These line plots show mean bootstrap ARI across 15 replicates for k=2,3,4, faceted by embedding dimension. K-means and RKM in blue and orange show strong stability at k=2, especially for 128 and 256 dimensional embeddings. Stability drops sharply at k=4 for both. PD and FPDC in green and purple are flat at or near zero across all settings — their full-data partitions do not re-emerge when we subsample, confirming the internal validity results.
 :::
-
----
-
-## K-means Stability Detail
-
-![](figures/kmeans-stability.png){width=88%}
-
-- Highest ARI at $k=2$ for 128 and 256 dimensions
-- 64-dimensional embedding less stable overall
-- Sharp drop at $k=4$ — consistent with the elbow selecting a less stable solution
-
-::: {.notes}
-Zooming in on K-means: the 128 and 256 dimensional results start near ARI of 0.8 at k=2 and fall to around 0.25 at k=4. The 64-dimensional results are weaker throughout. This stability profile directly contradicts the elbow-based k=4 selection — the data are most reproducibly partitioned at k=2.
-:::
-
----
-
-## RKM Stability Detail
-
-![](figures/rkm-stability.png){width=88%}
-
-- Very high ARI at $k=2$ for 128 and 256 dimensions (≈ 0.8–0.9)
-- 64-dimensional embedding weaker but consistent trend
-- Strongest and most coherent stability of all four methods
-
-::: {.notes}
-RKM shows the cleanest stability pattern. The two higher-dimensional embeddings reach ARI near 0.8 to 0.9 at k=2. The 64-dimensional embedding is weaker but still shows the same downward trend as k increases. RKM's selection rule — use silhouette — and its stability results are fully consistent with each other, which makes it the most trustworthy method in this study.
-:::
-
 ---
 
 ## FPDC Sensitivity to $\nu$

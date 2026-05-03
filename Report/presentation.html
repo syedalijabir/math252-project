@@ -159,9 +159,9 @@ Ali Jabir · Isis Martínez · Susan Peck
 <p><strong>Four Methods</strong></p>
 <ul>
 <li>K-means</li>
-<li>Probabilistic Distance (PD)</li>
-<li>Reduced K-means (RKM)</li>
-<li>Factorial PD (FPDC)</li>
+<li>PD Clustering</li>
+<li>Reduced K-means</li>
+<li>Factorial PD</li>
 </ul>
 </div></div>
 <p><strong>Key question:</strong> How do embedding dimension and clustering method jointly affect quality, stability, and interpretability?</p>
@@ -184,16 +184,17 @@ Ali Jabir · Isis Martínez · Susan Peck
 <div class="columns">
 <div class="column" style="width:50%;">
 <p><strong>Hard assignment</strong></p>
-<p><strong>K-means</strong> — minimizes within-cluster variance; fast and widely used; assumes spherical clusters</p>
-<p><strong>Reduced K-means (RKM)</strong> — simultaneously estimates a partition and a low-dimensional subspace; concentrates on clustering-relevant directions</p>
+<p><strong>K-means</strong></p>
+<p><strong>Reduced K-means</strong></p>
 </div><div class="column" style="width:50%;">
 <p><strong>Probabilistic assignment</strong></p>
-<p><strong>PD Clustering</strong> — soft memberships based on distance to cluster centers; robust to overlap and noise</p>
-<p><strong>Factorial PD (FPDC)</strong> — combines soft clustering with dimension reduction; handles overlap and high dimensionality jointly</p>
+<p><strong>PD Clustering</strong></p>
+<p><strong>Factorial PD</strong></p>
 </div></div>
 <p>The four methods differ along two axes: <strong>assignment</strong> (hard vs.&nbsp;probabilistic) and <strong>representation</strong> (full space vs.&nbsp;learned subspace).</p>
 <aside class="notes">
 <p>The methods form a 2x2 structure. K-means and RKM make hard assignments — every user belongs to exactly one cluster. PD and FPDC make soft assignments — users have partial membership in each cluster. RKM and FPDC additionally reduce dimensionality, which can help when cluster structure is clearer in a subspace than in the full embedding space. These differences have direct implications for robustness, runtime, and interpretability.</p>
+<p>— minimizes within-cluster variance; fast and widely used; assumes spherical clusters — simultaneously estimates a partition and a low-dimensional subspace; concentrates on clustering-relevant directions — soft memberships based on distance to cluster centers; robust to overlap and noise — combines soft clustering with dimension reduction; handles overlap and high dimensionality jointly</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -530,14 +531,8 @@ Ali Jabir · Isis Martínez · Susan Peck
 <section id="silhouette-by-method-and-embedding" class="slide level2">
 <h2>Silhouette by Method and Embedding</h2>
 
-<img data-src="figures/figure3_best_silhouette_by_method_embedding.png" style="width:82.0%" class="r-stretch"><ul>
-<li><strong>RKM dominates</strong> across all three embedding sizes</li>
-<li>128-dimensional embeddings provide the strongest signal</li>
-<li>PD and FPDC produce near-zero or negative silhouettes</li>
-<li>K-means is competitive only under silhouette-based selection</li>
-</ul>
-<aside class="notes">
-<p>This bar chart makes the ranking clear. RKM (teal) leads at every embedding size. The 128-dimensional embeddings give the highest bars overall. K-means orange bars are near zero because the elbow selected 4 clusters — if we used silhouette to select k for K-means it would look much more similar to RKM. PD green bars are barely visible. FPDC purple bars are sometimes negative for the 128 and 256 dimensional cases.</p>
+<img data-src="figures/figure3_best_silhouette_by_method_embedding.png" style="width:82.0%" class="r-stretch"><aside class="notes">
+<p>This bar chart makes the ranking clear. RKM (teal) leads at every embedding size. The 128-dimensional embeddings give the highest bars overall. K-means orange bars are near zero because the elbow selected 4 clusters — if we used silhouette to select k for K-means it would look much more similar to RKM. PD green bars are barely visible. FPDC purple bars are sometimes negative for the 128 and 256 dimensional cases. - <strong>RKM dominates</strong> across all three embedding sizes - 128-dimensional embeddings provide the strongest signal - PD and FPDC produce near-zero or negative silhouettes - K-means is competitive only under silhouette-based selection</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -553,14 +548,8 @@ Ali Jabir · Isis Martínez · Susan Peck
 <section id="runtime-vs.-quality-tradeoff" class="slide level2">
 <h2>Runtime vs.&nbsp;Quality Tradeoff</h2>
 
-<img data-src="figures/figure3_runtime_vs_silhouette.png" style="width:78.0%" class="r-stretch"><ul>
-<li><strong>PD:</strong> fastest, but silhouette ≈ 0 — fast and uninformative</li>
-<li><strong>K-means:</strong> fast and reasonable quality under silhouette selection</li>
-<li><strong>RKM:</strong> higher cost, but the only method with strong silhouette</li>
-<li><strong>FPDC:</strong> highest cost, weakest hard-partition quality</li>
-</ul>
-<aside class="notes">
-<p>This scatter plot has runtime on the log x-axis and silhouette on the y-axis. The ideal position is top-left — high quality at low cost. PD is bottom-left: cheap but useless for hard partitions. K-means is middle-left. RKM is middle-right: it costs more but earns it with silhouette around 0.3. FPDC is bottom-right: the worst of both worlds for hard partitions, though it does better on probability silhouette which is not shown here.</p>
+<img data-src="figures/figure3_runtime_vs_silhouette.png" style="width:78.0%" class="r-stretch"><aside class="notes">
+<p>This scatter plot has runtime on the log x-axis and silhouette on the y-axis. The ideal position is top-left — high quality at low cost. PD is bottom-left: cheap but useless for hard partitions. K-means is middle-left. RKM is middle-right: it costs more but earns it with silhouette around 0.3. FPDC is bottom-right: the worst of both worlds for hard partitions, though it does better on probability silhouette which is not shown here. - <strong>PD:</strong> fastest, but silhouette ≈ 0 — fast and uninformative - <strong>K-means:</strong> fast and reasonable quality under silhouette selection - <strong>RKM:</strong> higher cost, but the only method with strong silhouette - <strong>FPDC:</strong> highest cost, weakest hard-partition quality</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -576,13 +565,8 @@ Ali Jabir · Isis Martínez · Susan Peck
 <section id="partition-agreement-across-methods" class="slide level2">
 <h2>Partition Agreement Across Methods</h2>
 
-<img data-src="figures/figure4_average_ari_by_method_pair.png" style="width:75.0%" class="r-stretch"><ul>
-<li><strong>K-means vs RKM: ARI = 0.586</strong> — both recover the same structure</li>
-<li>All pairs involving PD or FPDC: ARI &lt; 0.10</li>
-<li>Probabilistic methods find fundamentally different partitions</li>
-</ul>
-<aside class="notes">
-<p>This bar chart shows pairwise ARI between methods. K-means and RKM agree strongly — average ARI of 0.586 with a max of 0.988 — meaning they find essentially the same underlying two-group partition despite their different formulations. Everything involving PD or FPDC is near zero, confirming those methods are finding something completely different — and given their near-zero silhouettes, likely just noise rather than real structure.</p>
+<img data-src="figures/figure4_average_ari_by_method_pair.png" style="width:75.0%" class="r-stretch"><aside class="notes">
+<p>This bar chart shows pairwise ARI between methods. K-means and RKM agree strongly — average ARI of 0.586 with a max of 0.988 — meaning they find essentially the same underlying two-group partition despite their different formulations. Everything involving PD or FPDC is near zero, confirming those methods are finding something completely different — and given their near-zero silhouettes, likely just noise rather than real structure. - <strong>K-means vs RKM: ARI = 0.586</strong> — both recover the same structure - All pairs involving PD or FPDC: ARI &lt; 0.10 - Probabilistic methods find fundamentally different partitions</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -598,52 +582,8 @@ Ali Jabir · Isis Martínez · Susan Peck
 <section id="bootstrap-stability" class="slide level2">
 <h2>Bootstrap Stability</h2>
 
-<img data-src="figures/figures/all-methods-stability.png" style="width:88.0%" class="r-stretch"><aside class="notes">
+<img data-src="figures/stability_all_methods_by_embedding.png" style="width:88.0%" class="r-stretch"><aside class="notes">
 <p>These line plots show mean bootstrap ARI across 15 replicates for k=2,3,4, faceted by embedding dimension. K-means and RKM in blue and orange show strong stability at k=2, especially for 128 and 256 dimensional embeddings. Stability drops sharply at k=4 for both. PD and FPDC in green and purple are flat at or near zero across all settings — their full-data partitions do not re-emerge when we subsample, confirming the internal validity results.</p>
-<style type="text/css">
-        span.MJX_Assistive_MathML {
-          position:absolute!important;
-          clip: rect(1px, 1px, 1px, 1px);
-          padding: 1px 0 0 0!important;
-          border: 0!important;
-          height: 1px!important;
-          width: 1px!important;
-          overflow: hidden!important;
-          display:block!important;
-      }</style></aside>
-</section>
-<section id="k-means-stability-detail" class="slide level2">
-<h2>K-means Stability Detail</h2>
-
-<img data-src="figures/kmeans-stability.png" style="width:88.0%" class="r-stretch"><ul>
-<li>Highest ARI at <span class="math inline">\(k=2\)</span> for 128 and 256 dimensions</li>
-<li>64-dimensional embedding less stable overall</li>
-<li>Sharp drop at <span class="math inline">\(k=4\)</span> — consistent with the elbow selecting a less stable solution</li>
-</ul>
-<aside class="notes">
-<p>Zooming in on K-means: the 128 and 256 dimensional results start near ARI of 0.8 at k=2 and fall to around 0.25 at k=4. The 64-dimensional results are weaker throughout. This stability profile directly contradicts the elbow-based k=4 selection — the data are most reproducibly partitioned at k=2.</p>
-<style type="text/css">
-        span.MJX_Assistive_MathML {
-          position:absolute!important;
-          clip: rect(1px, 1px, 1px, 1px);
-          padding: 1px 0 0 0!important;
-          border: 0!important;
-          height: 1px!important;
-          width: 1px!important;
-          overflow: hidden!important;
-          display:block!important;
-      }</style></aside>
-</section>
-<section id="rkm-stability-detail" class="slide level2">
-<h2>RKM Stability Detail</h2>
-
-<img data-src="figures/rkm-stability.png" style="width:88.0%" class="r-stretch"><ul>
-<li>Very high ARI at <span class="math inline">\(k=2\)</span> for 128 and 256 dimensions (≈ 0.8–0.9)</li>
-<li>64-dimensional embedding weaker but consistent trend</li>
-<li>Strongest and most coherent stability of all four methods</li>
-</ul>
-<aside class="notes">
-<p>RKM shows the cleanest stability pattern. The two higher-dimensional embeddings reach ARI near 0.8 to 0.9 at k=2. The 64-dimensional embedding is weaker but still shows the same downward trend as k increases. RKM’s selection rule — use silhouette — and its stability results are fully consistent with each other, which makes it the most trustworthy method in this study.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -835,7 +775,7 @@ Ali Jabir · Isis Martínez · Susan Peck
     </div>
   <div class="quarto-auto-generated-content" style="display: none;">
 <div class="footer footer-default">
-<p>Math 252 · Dr.&nbsp;Cristina Tortora · SJSU</p>
+
 </div>
 </div></div>
 
