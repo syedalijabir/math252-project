@@ -12,17 +12,24 @@ For K-means, we also reported total within-cluster sum of squares because it dir
 
 We selected each method with a **method-specific hierarchy** of criteria shown in Table \ref{tab:tuning-summary}.
 
-## Stability
-
-We assessed bootstrap stability with 15 bootstrap replicates for each combination of method, embedding dimension, and cluster count [@everitt2011cluster]. In each replicate, we sampled 30\% of users with replacement, refit the clustering model on the bootstrap sample, and compared the resulting partition with the full-data reference partition by adjusted Rand index (ARI) [@kaufman1990finding]. Adjusted Rand index ranges from 0 for chance-level agreement to 1 for perfect agreement, so larger values indicate more reproducible solutions. For PD and FPDC, we converted soft memberships to hard labels by assigning each user to the cluster with the highest membership probability before computing adjusted Rand index.
-
-We also compared the final partitions across methods with pairwise adjusted Rand indices computed within matched embedding dimensions and matched cluster counts. This comparison tells us whether different methods recover the same underlying structure or fundamentally different partitions.
-
-## Runtime and Computational Cost
-
-We recorded wall-clock runtime for every cached model fit and used runtime as an empirical measure of computational complexity. K-means and PD mainly scale with repeated distance calculations between users and cluster centers, so they remain comparatively fast. RKM adds the cost of estimating and rotating a lower-dimensional subspace. FPDC adds both subspace estimation and iterative soft-membership updates, and it also tunes $\nu$. We therefore interpreted runtime jointly with fit quality: a more complex method should deliver a clear gain in clustering quality if it is going to justify higher computational cost.
-
-## Implementation Summary
+>\begin{table}[htbp]
+\centering
+\small
+\caption{Tuning ranges and model-selection rules for each clustering method.}
+\label{tab:tuning-summary}
+\resizebox{\textwidth}{!}{
+\begin{tabular}{lllllll}
+\toprule
+Method & Cluster-count range & Retained-factor range & \(\nu\) values tested & Primary criterion & Secondary criterion & Tertiary criterion \\
+\midrule
+K-means & 2--20 & --- & --- & WSS elbow diagnostic & Average silhouette width & Calinski--Harabasz index and bootstrap stability \\
+Reduced K-means & 2--10 & 2--6 factors & --- & Average silhouette width over all cluster/factor combinations & Calinski--Harabasz index & Bootstrap stability \\
+PD clustering & 2--5 & --- & --- & Probability silhouette & Average silhouette width & Calinski--Harabasz index \\
+FPDC & 2--8 & 2--5 factors & 2, 6, 10 & Probability silhouette over all cluster/factor/\(\nu\) combinations & Average silhouette width & Calinski--Harabasz index and bootstrap stability \\
+\bottomrule
+\end{tabular}
+}
+\end{table} <
 
 
 \begin{table}[htbp]
@@ -43,6 +50,19 @@ FPDC & 2--8 & 2--5 & Probability silhouette for all (k,q, $\nu$) combinations & 
 \end{tabular}
 }
 \end{table}
+
+
+## Stability
+
+We assessed bootstrap stability with 15 bootstrap replicates for each combination of method, embedding dimension, and cluster count [@everitt2011cluster]. In each replicate, we sampled 30\% of users with replacement, refit the clustering model on the bootstrap sample, and compared the resulting partition with the full-data reference partition by adjusted Rand index (ARI) [@kaufman1990finding]. Adjusted Rand index ranges from 0 for chance-level agreement to 1 for perfect agreement, so larger values indicate more reproducible solutions. For PD and FPDC, we converted soft memberships to hard labels by assigning each user to the cluster with the highest membership probability before computing adjusted Rand index.
+
+We also compared the final partitions across methods with pairwise adjusted Rand indices computed within matched embedding dimensions and matched cluster counts. This comparison tells us whether different methods recover the same underlying structure or fundamentally different partitions.
+
+## Runtime and Computational Cost
+
+We recorded wall-clock runtime for every cached model fit and used runtime as an empirical measure of computational complexity. K-means and PD mainly scale with repeated distance calculations between users and cluster centers, so they remain comparatively fast. RKM adds the cost of estimating and rotating a lower-dimensional subspace. FPDC adds both subspace estimation and iterative soft-membership updates, and it also tunes $\nu$. We therefore interpreted runtime jointly with fit quality: a more complex method should deliver a clear gain in clustering quality if it is going to justify higher computational cost.
+
+## Implementation Summary
 
 Table \ref{tab:tuning-summary} summarizes the tuning grids and selection rules. The methods use different parameter ranges because they solve different optimization problems and incur different computational costs. K-means only tunes the number of clusters, so it can support a broad cluster-count range and a full elbow diagnostic. RKM and FPDC tune both cluster counts and retained factors, so their search grids grow much more quickly. FPDC also tunes $\nu$, which further expands the search space. The Tucker-factor diagnostics increased smoothly with the number of retained factors and did not show a sharp elbow, so we treated large retained-factor values as offering only incremental gains. That pattern justified a slightly broader retained-factor range for RKM and a more compact retained-factor range for FPDC.
 
