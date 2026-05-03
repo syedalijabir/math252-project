@@ -1,0 +1,92 @@
+---
+title: "Reel Intelligence: MovieLens Clustering"
+subtitle: "Final Project Report, Spring 2026"
+author:
+  - Ali Jabir
+  - Isis Martínez
+  - Susan Peck
+date: "May 2, 2026"
+format:
+  pdf:
+    latex-auto-install: true
+    latex-tinytex: false
+    keep-tex: false
+fontsize: 11pt
+geometry: margin=1in
+header-includes:
+  - \usepackage{amsmath}
+  - \usepackage{amssymb}
+  - \usepackage{booktabs}
+  - \usepackage{longtable}
+  - \usepackage{array}
+  - \usepackage{float}
+  - \usepackage{setspace}
+  - \usepackage{graphicx}
+  - \usepackage{caption}
+  - \usepackage{hyperref}
+bibliography: refs.bib
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = FALSE,
+  warning = FALSE,
+  message = FALSE,
+  fig.width = 8,
+  fig.height = 5.5,
+  dpi = 120
+)
+
+library(dplyr)
+library(ggplot2)
+library(knitr)
+library(scales)
+
+
+source("compare_results_helpers.R")
+
+compare_results <- build_compare_results_data(
+  cache_root = file.path("..", "output", "benchmark_cache")
+)
+
+plot_df <- compare_results$plot_df
+best_models_df <- compare_results$best_models_df
+best_table <- compare_results$best_table
+overall_best <- compare_results$overall_best
+ari_df <- compare_results$ari_df
+ari_summary <- compare_results$ari_summary
+```
+
+
+\begin{center}
+\textbf{Clustering Analysis (Math 252)}\\
+Professor: Dr. Cristina Tortora\\
+Department of Statistics\\
+San Jose State University
+\end{center}
+
+# Abstract
+
+This study evaluates clustering structure in user embeddings learned from the MovieLens 1M dataset. We generate embeddings using a multilayer perceptron and examine three embedding dimensions (64, 128, and 256). Four clustering methods are compared: k-means, probabilistic distance (PD) clustering, reduced k-means, and factorial probabilistic distance clustering (FPDC). Because no ground-truth labels are available, evaluation is based on internal validation metrics, bootstrap stability, partition agreement, and runtime.
+
+The results provide only modest evidence of clustering structure in the learned embeddings. Reduced K-means produces the strongest and most consistent hard partitions, particularly in the 128-dimensional embedding space. K-means recovers similar structure but is sensitive to the choice of tuning criterion. In contrast, PD clustering and FPDC do not yield stable or well-separated partitions under the evaluation framework used in this study. Across methods, the 128-dimensional embeddings provide the clearest clustering signal.
+
+Overall, the findings suggest that while embedding-based representations of user behavior contain some clustering tendency, the resulting structure is weak and sensitive to modeling choices, limiting strong interpretation of distinct user groups.
+
+{{< include sections/01-introduction.qmd >}}
+
+{{< include sections/02-background.qmd >}}
+
+{{< include sections/03-dataset.qmd >}}
+
+{{< include sections/04-methods.qmd >}}
+
+{{< include sections/05-evaluation.qmd >}}
+
+{{< include sections/06-results.qmd >}}
+
+{{< include sections/07-conclusion.qmd >}}
+
+{{< include sections/08-appendix.qmd >}}
+
+# References
