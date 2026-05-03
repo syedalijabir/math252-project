@@ -1,0 +1,1237 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<script src="presentation_files/libs/clipboard/clipboard.min.js"></script>
+<script src="presentation_files/libs/quarto-html/tabby.min.js"></script>
+<script src="presentation_files/libs/quarto-html/popper.min.js"></script>
+<script src="presentation_files/libs/quarto-html/tippy.umd.min.js"></script>
+<link href="presentation_files/libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="presentation_files/libs/quarto-html/light-border.css" rel="stylesheet">
+<link href="presentation_files/libs/quarto-html/quarto-syntax-highlighting-de84f8d6bb715db06a919283c2d1e787.css" rel="stylesheet" id="quarto-text-highlighting-styles"><meta charset="utf-8">
+  <meta name="generator" content="quarto-1.6.42">
+
+  <meta name="author" content="Ali Jabir · Isis Martínez · Susan Peck">
+  <meta name="dcterms.date" content="2026-05-02">
+  <title>Reel Intelligence: MovieLens Clustering</title>
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, minimal-ui">
+  <link rel="stylesheet" href="presentation_files/libs/revealjs/dist/reset.css">
+  <link rel="stylesheet" href="presentation_files/libs/revealjs/dist/reveal.css">
+  <style>
+    code{white-space: pre-wrap;}
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: min(4vw, 1.5em);}
+    div.column{flex: auto; overflow-x: auto;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    ul.task-list{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+      vertical-align: middle;
+    }
+  </style>
+  <link rel="stylesheet" href="presentation_files/libs/revealjs/dist/theme/quarto-8f3eebe07241f08526c91a7e9cbef8fd.css">
+  <link href="presentation_files/libs/revealjs/plugin/quarto-line-highlight/line-highlight.css" rel="stylesheet">
+  <link href="presentation_files/libs/revealjs/plugin/reveal-menu/menu.css" rel="stylesheet">
+  <link href="presentation_files/libs/revealjs/plugin/reveal-menu/quarto-menu.css" rel="stylesheet">
+  <link href="presentation_files/libs/revealjs/plugin/quarto-support/footer.css" rel="stylesheet">
+  <style type="text/css">
+    .reveal div.sourceCode {
+      margin: 0;
+      overflow: auto;
+    }
+    .reveal div.hanging-indent {
+      margin-left: 1em;
+      text-indent: -1em;
+    }
+    .reveal .slide:not(.center) {
+      height: 100%;
+    }
+    .reveal .slide.scrollable {
+      overflow-y: auto;
+    }
+    .reveal .footnotes {
+      height: 100%;
+      overflow-y: auto;
+    }
+    .reveal .slide .absolute {
+      position: absolute;
+      display: block;
+    }
+    .reveal .footnotes ol {
+      counter-reset: ol;
+      list-style-type: none; 
+      margin-left: 0;
+    }
+    .reveal .footnotes ol li:before {
+      counter-increment: ol;
+      content: counter(ol) ". "; 
+    }
+    .reveal .footnotes ol li > p:first-child {
+      display: inline-block;
+    }
+    .reveal .slide ul,
+    .reveal .slide ol {
+      margin-bottom: 0.5em;
+    }
+    .reveal .slide ul li,
+    .reveal .slide ol li {
+      margin-top: 0.4em;
+      margin-bottom: 0.2em;
+    }
+    .reveal .slide ul[role="tablist"] li {
+      margin-bottom: 0;
+    }
+    .reveal .slide ul li > *:first-child,
+    .reveal .slide ol li > *:first-child {
+      margin-block-start: 0;
+    }
+    .reveal .slide ul li > *:last-child,
+    .reveal .slide ol li > *:last-child {
+      margin-block-end: 0;
+    }
+    .reveal .slide .columns:nth-child(3) {
+      margin-block-start: 0.8em;
+    }
+    .reveal blockquote {
+      box-shadow: none;
+    }
+    .reveal .tippy-content>* {
+      margin-top: 0.2em;
+      margin-bottom: 0.7em;
+    }
+    .reveal .tippy-content>*:last-child {
+      margin-bottom: 0.2em;
+    }
+    .reveal .slide > img.stretch.quarto-figure-center,
+    .reveal .slide > img.r-stretch.quarto-figure-center {
+      display: block;
+      margin-left: auto;
+      margin-right: auto; 
+    }
+    .reveal .slide > img.stretch.quarto-figure-left,
+    .reveal .slide > img.r-stretch.quarto-figure-left  {
+      display: block;
+      margin-left: 0;
+      margin-right: auto; 
+    }
+    .reveal .slide > img.stretch.quarto-figure-right,
+    .reveal .slide > img.r-stretch.quarto-figure-right  {
+      display: block;
+      margin-left: auto;
+      margin-right: 0; 
+    }
+  </style>
+</head>
+<body class="quarto-light">
+  <div class="reveal">
+    <div class="slides">
+
+<section id="title-slide" class="quarto-title-block center">
+  <h1 class="title">Reel Intelligence: MovieLens Clustering</h1>
+  <p class="subtitle">Clustering Analysis — Math 252, Spring 2026</p>
+
+<div class="quarto-title-authors">
+<div class="quarto-title-author">
+<div class="quarto-title-author-name">
+Ali Jabir · Isis Martínez · Susan Peck 
+</div>
+        <p class="quarto-title-affiliation">
+            Department of Statistics, San Jose State University
+          </p>
+    </div>
+</div>
+
+  <p class="date">2026-05-02</p>
+</section>
+<section id="overview" class="slide level2">
+<h2>Overview</h2>
+<p><strong>Goal:</strong> Evaluate clustering structure in learned user embeddings from MovieLens 1M</p>
+<div class="columns">
+<div class="column" style="width:50%;">
+<p><strong>Dataset</strong></p>
+<ul>
+<li>~1 million ratings</li>
+<li>6,040 users · 3,706 movies</li>
+<li>Embeddings: 64, 128, 256 dimensions</li>
+</ul>
+</div><div class="column" style="width:50%;">
+<p><strong>Four Methods</strong></p>
+<ul>
+<li>K-means</li>
+<li>Probabilistic Distance (PD)</li>
+<li>Reduced K-means (RKM)</li>
+<li>Factorial PD (FPDC)</li>
+</ul>
+</div></div>
+<p><strong>Key question:</strong> How do embedding dimension and clustering method jointly affect quality, stability, and interpretability?</p>
+<aside class="notes">
+<p>Welcome. This project asks whether user behavior in movie ratings forms meaningful groups. We learned dense embeddings from a neural network and then applied four clustering methods. We have no ground truth labels so all evaluation is internal. The talk is about 10 minutes — I’ll cover the methods, data, evaluation framework, and results.</p>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
+</section>
+<section id="the-four-methods" class="slide level2">
+<h2>The Four Methods</h2>
+<div class="columns">
+<div class="column" style="width:50%;">
+<p><strong>Hard assignment</strong></p>
+<p><strong>K-means</strong> — minimizes within-cluster variance; fast and widely used; assumes spherical clusters</p>
+<p><strong>Reduced K-means (RKM)</strong> — simultaneously estimates a partition and a low-dimensional subspace; concentrates on clustering-relevant directions</p>
+</div><div class="column" style="width:50%;">
+<p><strong>Probabilistic assignment</strong></p>
+<p><strong>PD Clustering</strong> — soft memberships based on distance to cluster centers; robust to overlap and noise</p>
+<p><strong>Factorial PD (FPDC)</strong> — combines soft clustering with dimension reduction; handles overlap and high dimensionality jointly</p>
+</div></div>
+<p>The four methods differ along two axes: <strong>assignment</strong> (hard vs.&nbsp;probabilistic) and <strong>representation</strong> (full space vs.&nbsp;learned subspace).</p>
+<aside class="notes">
+<p>The methods form a 2x2 structure. K-means and RKM make hard assignments — every user belongs to exactly one cluster. PD and FPDC make soft assignments — users have partial membership in each cluster. RKM and FPDC additionally reduce dimensionality, which can help when cluster structure is clearer in a subspace than in the full embedding space. These differences have direct implications for robustness, runtime, and interpretability.</p>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
+</section>
+<section id="embedding-generation" class="slide level2">
+<h2>Embedding Generation</h2>
+<div class="columns">
+<div class="column" style="width:55%;">
+<p><strong>Pipeline:</strong></p>
+<ol type="1">
+<li>Build sparse user–item rating matrix (6040 × 3706)</li>
+<li>Mean-center by movie; impute missing with zero</li>
+<li>Train MLP to compress each user into a dense vector</li>
+<li>Cluster in each embedding space separately</li>
+</ol>
+<p><strong>Three embedding sizes:</strong> 64, 128, 256 dimensions</p>
+</div><div class="column" style="width:45%;">
+<div class="quarto-figure quarto-figure-center">
+<figure>
+<p><img data-src="figures/mlp_architecture.png" style="width:90.0%"></p>
+<figcaption>MLP architecture</figcaption>
+</figure>
+</div>
+</div></div>
+<aside class="notes">
+<p>We used a two-layer MLP. The input is a 3706-dimensional user vector. A hidden layer of size 512 with a sigmoid activation compresses it, then a second linear layer outputs the embedding. We trained three versions — outputting 64, 128, and 256 dimensions — to study whether representation capacity affects clustering quality. Clustering is never done on the raw sparse matrix; always on the dense embeddings.</p>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
+</section>
+<section id="evaluation-framework" class="slide level2">
+<h2>Evaluation Framework</h2>
+<p>Because there are <strong>no ground-truth labels</strong>, evaluation uses four complementary approaches:</p>
+<table class="caption-top">
+<thead>
+<tr class="header">
+<th>Criterion</th>
+<th>Metric</th>
+<th>Methods</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Internal validity</td>
+<td>Average silhouette width</td>
+<td>All four</td>
+</tr>
+<tr class="even">
+<td>Internal validity</td>
+<td>Calinski-Harabasz (CH) index</td>
+<td>All four</td>
+</tr>
+<tr class="odd">
+<td>Internal validity</td>
+<td>Probability silhouette</td>
+<td>PD, FPDC only</td>
+</tr>
+<tr class="even">
+<td>Stability</td>
+<td>Bootstrap ARI (15 replicates, 30% subsample)</td>
+<td>All four</td>
+</tr>
+<tr class="odd">
+<td>Agreement</td>
+<td>Pairwise ARI across methods</td>
+<td>All four</td>
+</tr>
+<tr class="even">
+<td>Efficiency</td>
+<td>Wall-clock runtime</td>
+<td>All four</td>
+</tr>
+</tbody>
+</table>
+<aside class="notes">
+<p>Since we have no labels, we can’t compute accuracy. Instead we assess cluster quality from three angles. Silhouette measures how much closer each user is to its own cluster than to the nearest competing cluster. The CH index rewards compact, well-separated clusters. For PD and FPDC we also compute probability silhouette which accounts for soft memberships. Bootstrap stability runs each method on 15 subsamples and measures how reproducible the partition is using ARI — adjusted Rand index, which ranges from 0 for chance agreement to 1 for perfect agreement. Finally we measure runtime because more complex methods need to justify their cost.</p>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
+</section>
+<section id="parameter-search-grids" class="slide level2">
+<h2>Parameter Search Grids</h2>
+<table class="caption-top" data-quarto-postprocess="true" style="font-size:0.85em; width:100%">
+<thead>
+<tr class="header">
+<th data-quarto-table-cell-role="th">Method</th>
+<th data-quarto-table-cell-role="th">k range</th>
+<th data-quarto-table-cell-role="th">q range</th>
+<th data-quarto-table-cell-role="th">ν</th>
+<th data-quarto-table-cell-role="th">Primary criterion</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>K-means</td>
+<td>2–20</td>
+<td>—</td>
+<td>—</td>
+<td>WSS elbow → silhouette, CH</td>
+</tr>
+<tr class="even">
+<td>RKM</td>
+<td>2–10</td>
+<td>2–6</td>
+<td>—</td>
+<td>Silhouette (CH tiebreaker)</td>
+</tr>
+<tr class="odd">
+<td>PD</td>
+<td>2–5</td>
+<td>—</td>
+<td>—</td>
+<td>Probability silhouette</td>
+</tr>
+<tr class="even">
+<td>FPDC</td>
+<td>2–8</td>
+<td>2–5</td>
+<td>6, 10</td>
+<td>Probability silhouette</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li>K-means requires only <span class="math inline">\(k\)</span> → broad range, full WSS elbow diagnostic</li>
+<li>RKM requires <span class="math inline">\(k\)</span> and <span class="math inline">\(q\)</span> → two-dimensional grid</li>
+<li>FPDC also requires <span class="math inline">\(\nu\)</span> → most complex search space</li>
+<li>All results cached to <code>.rds</code> for reproducibility</li>
+</ul>
+<aside class="notes">
+<p>Each method has a different number of parameters to specify. K-means only needs the number of clusters, so we can search broadly and use the elbow diagnostic. RKM needs both k and q — the number of retained factors — so the search grid grows faster. FPDC additionally needs nu, a tuning parameter controlling the soft-membership concentration. We excluded nu=2 because pilot runs were highly inconsistent. All fits were cached so the report renders without re-running the full pipeline.</p>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
+</section>
+<section id="best-selected-models" class="slide level2 smaller">
+<h2>Best Selected Models</h2>
+<table class="caption-top" data-quarto-postprocess="true" style="font-size:0.78em; width:100%">
+<thead>
+<tr class="header">
+<th data-quarto-table-cell-role="th">Method</th>
+<th data-quarto-table-cell-role="th">Embedding</th>
+<th data-quarto-table-cell-role="th">k</th>
+<th data-quarto-table-cell-role="th">q</th>
+<th data-quarto-table-cell-role="th">ν</th>
+<th data-quarto-table-cell-role="th">Runtime (s)</th>
+<th data-quarto-table-cell-role="th">Silhouette</th>
+<th data-quarto-table-cell-role="th">CH</th>
+<th data-quarto-table-cell-role="th">Prob. silh.</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd" style="background:#f5f5f5">
+<td>K-means</td>
+<td>64</td>
+<td>4</td>
+<td>—</td>
+<td>—</td>
+<td>7.35</td>
+<td>-0.011</td>
+<td>96.96</td>
+<td>—</td>
+</tr>
+<tr class="even" style="background:#f5f5f5">
+<td>PD</td>
+<td>64</td>
+<td>2</td>
+<td>—</td>
+<td>—</td>
+<td>0.29</td>
+<td>0.003</td>
+<td>10.14</td>
+<td>0.093</td>
+</tr>
+<tr class="odd" style="background:#e8f4e8">
+<td><strong>RKM</strong></td>
+<td>64</td>
+<td>2</td>
+<td>2</td>
+<td>—</td>
+<td>278.90</td>
+<td><strong>0.235</strong></td>
+<td>132.29</td>
+<td>—</td>
+</tr>
+<tr class="even" style="background:#f5f5f5">
+<td>FPDC</td>
+<td>64</td>
+<td>2</td>
+<td>4</td>
+<td>6</td>
+<td>241.74</td>
+<td>0.012</td>
+<td>70.55</td>
+<td>0.143</td>
+</tr>
+<tr class="odd" style="background:#f5f5f5">
+<td>K-means</td>
+<td>128</td>
+<td>4</td>
+<td>—</td>
+<td>—</td>
+<td>12.72</td>
+<td>-0.010</td>
+<td>91.21</td>
+<td>—</td>
+</tr>
+<tr class="even" style="background:#f5f5f5">
+<td>PD</td>
+<td>128</td>
+<td>2</td>
+<td>—</td>
+<td>—</td>
+<td>0.18</td>
+<td>0.000</td>
+<td>0.92</td>
+<td>0.068</td>
+</tr>
+<tr class="odd" style="background:#c8e6c9">
+<td><strong>RKM</strong></td>
+<td><strong>128</strong></td>
+<td>2</td>
+<td>4</td>
+<td>—</td>
+<td>184.10</td>
+<td><strong>0.331</strong></td>
+<td>139.52</td>
+<td>—</td>
+</tr>
+<tr class="even" style="background:#f5f5f5">
+<td>FPDC</td>
+<td>128</td>
+<td>4</td>
+<td>2</td>
+<td>6</td>
+<td>188.16</td>
+<td>-0.115</td>
+<td>56.43</td>
+<td>0.136</td>
+</tr>
+<tr class="odd" style="background:#f5f5f5">
+<td>K-means</td>
+<td>256</td>
+<td>4</td>
+<td>—</td>
+<td>—</td>
+<td>23.45</td>
+<td>0.026</td>
+<td>74.77</td>
+<td>—</td>
+</tr>
+<tr class="even" style="background:#f5f5f5">
+<td>PD</td>
+<td>256</td>
+<td>2</td>
+<td>—</td>
+<td>—</td>
+<td>0.26</td>
+<td>0.000</td>
+<td>1.07</td>
+<td>0.062</td>
+</tr>
+<tr class="odd" style="background:#e8f4e8">
+<td><strong>RKM</strong></td>
+<td>256</td>
+<td>2</td>
+<td>5</td>
+<td>—</td>
+<td>257.64</td>
+<td><strong>0.290</strong></td>
+<td>111.25</td>
+<td>—</td>
+</tr>
+<tr class="even" style="background:#f5f5f5">
+<td>FPDC</td>
+<td>256</td>
+<td>6</td>
+<td>3</td>
+<td>10</td>
+<td>70.74</td>
+<td>-0.209</td>
+<td>33.92</td>
+<td>0.148</td>
+</tr>
+</tbody>
+</table>
+<p><strong>RKM 128-dim is the overall winner:</strong> silhouette 0.331, CH 139.52</p>
+<aside class="notes">
+<p>This table shows the final selected model for each method and embedding. RKM rows are highlighted in green. The best solution overall is RKM on 128-dimensional embeddings with 2 clusters and 4 retained factors. K-means selected 4 clusters in all embeddings because the WSS elbow diagnostic pointed there — but those solutions have negative or near-zero silhouette, meaning the elbow-selected partition is not well-separated. PD and FPDC produced near-zero or negative silhouettes throughout. The 128-dimensional embedding consistently gave the best results across methods.</p>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
+</section>
+<section id="silhouette-by-method-and-embedding" class="slide level2">
+<h2>Silhouette by Method and Embedding</h2>
+
+<img data-src="figures/figure3_best_silhouette_by_method_embedding.png" style="width:82.0%" class="r-stretch"><ul>
+<li><strong>RKM dominates</strong> across all three embedding sizes</li>
+<li>128-dimensional embeddings provide the strongest signal</li>
+<li>PD and FPDC produce near-zero or negative silhouettes</li>
+<li>K-means is competitive only under silhouette-based selection</li>
+</ul>
+<aside class="notes">
+<p>This bar chart makes the ranking clear. RKM (teal) leads at every embedding size. The 128-dimensional embeddings give the highest bars overall. K-means orange bars are near zero because the elbow selected 4 clusters — if we used silhouette to select k for K-means it would look much more similar to RKM. PD green bars are barely visible. FPDC purple bars are sometimes negative for the 128 and 256 dimensional cases.</p>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
+</section>
+<section id="runtime-vs.-quality-tradeoff" class="slide level2">
+<h2>Runtime vs.&nbsp;Quality Tradeoff</h2>
+
+<img data-src="figures/figure3_runtime_vs_silhouette.png" style="width:78.0%" class="r-stretch"><ul>
+<li><strong>PD:</strong> fastest, but silhouette ≈ 0 — fast and uninformative</li>
+<li><strong>K-means:</strong> fast and reasonable quality under silhouette selection</li>
+<li><strong>RKM:</strong> higher cost, but the only method with strong silhouette</li>
+<li><strong>FPDC:</strong> highest cost, weakest hard-partition quality</li>
+</ul>
+<aside class="notes">
+<p>This scatter plot has runtime on the log x-axis and silhouette on the y-axis. The ideal position is top-left — high quality at low cost. PD is bottom-left: cheap but useless for hard partitions. K-means is middle-left. RKM is middle-right: it costs more but earns it with silhouette around 0.3. FPDC is bottom-right: the worst of both worlds for hard partitions, though it does better on probability silhouette which is not shown here.</p>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
+</section>
+<section id="partition-agreement-across-methods" class="slide level2">
+<h2>Partition Agreement Across Methods</h2>
+
+<img data-src="figures/figure4_average_ari_by_method_pair.png" style="width:75.0%" class="r-stretch"><ul>
+<li><strong>K-means vs RKM: ARI = 0.586</strong> — both recover the same structure</li>
+<li>All pairs involving PD or FPDC: ARI &lt; 0.10</li>
+<li>Probabilistic methods find fundamentally different partitions</li>
+</ul>
+<aside class="notes">
+<p>This bar chart shows pairwise ARI between methods. K-means and RKM agree strongly — average ARI of 0.586 with a max of 0.988 — meaning they find essentially the same underlying two-group partition despite their different formulations. Everything involving PD or FPDC is near zero, confirming those methods are finding something completely different — and given their near-zero silhouettes, likely just noise rather than real structure.</p>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
+</section>
+<section id="bootstrap-stability" class="slide level2">
+<h2>Bootstrap Stability</h2>
+
+<img data-src="figures/figures/all-methods-stability.png" style="width:88.0%" class="r-stretch"><aside class="notes">
+<p>These line plots show mean bootstrap ARI across 15 replicates for k=2,3,4, faceted by embedding dimension. K-means and RKM in blue and orange show strong stability at k=2, especially for 128 and 256 dimensional embeddings. Stability drops sharply at k=4 for both. PD and FPDC in green and purple are flat at or near zero across all settings — their full-data partitions do not re-emerge when we subsample, confirming the internal validity results.</p>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
+</section>
+<section id="k-means-stability-detail" class="slide level2">
+<h2>K-means Stability Detail</h2>
+
+<img data-src="figures/kmeans-stability.png" style="width:88.0%" class="r-stretch"><ul>
+<li>Highest ARI at <span class="math inline">\(k=2\)</span> for 128 and 256 dimensions</li>
+<li>64-dimensional embedding less stable overall</li>
+<li>Sharp drop at <span class="math inline">\(k=4\)</span> — consistent with the elbow selecting a less stable solution</li>
+</ul>
+<aside class="notes">
+<p>Zooming in on K-means: the 128 and 256 dimensional results start near ARI of 0.8 at k=2 and fall to around 0.25 at k=4. The 64-dimensional results are weaker throughout. This stability profile directly contradicts the elbow-based k=4 selection — the data are most reproducibly partitioned at k=2.</p>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
+</section>
+<section id="rkm-stability-detail" class="slide level2">
+<h2>RKM Stability Detail</h2>
+
+<img data-src="figures/rkm-stability.png" style="width:88.0%" class="r-stretch"><ul>
+<li>Very high ARI at <span class="math inline">\(k=2\)</span> for 128 and 256 dimensions (≈ 0.8–0.9)</li>
+<li>64-dimensional embedding weaker but consistent trend</li>
+<li>Strongest and most coherent stability of all four methods</li>
+</ul>
+<aside class="notes">
+<p>RKM shows the cleanest stability pattern. The two higher-dimensional embeddings reach ARI near 0.8 to 0.9 at k=2. The 64-dimensional embedding is weaker but still shows the same downward trend as k increases. RKM’s selection rule — use silhouette — and its stability results are fully consistent with each other, which makes it the most trustworthy method in this study.</p>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
+</section>
+<section id="fpdc-sensitivity-to-nu" class="slide level2">
+<h2>FPDC Sensitivity to <span class="math inline">\(\nu\)</span></h2>
+<table class="caption-top">
+<thead>
+<tr class="header">
+<th>Embedding</th>
+<th><span class="math inline">\(\nu\)</span></th>
+<th>k</th>
+<th>q</th>
+<th>Silhouette</th>
+<th>CH</th>
+<th>Prob. silh.</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>64</td>
+<td>6</td>
+<td>2</td>
+<td>4</td>
+<td>0.012</td>
+<td>70.55</td>
+<td>0.143</td>
+</tr>
+<tr class="even">
+<td>64</td>
+<td>10</td>
+<td>2</td>
+<td>4</td>
+<td>0.012</td>
+<td>69.93</td>
+<td>0.143</td>
+</tr>
+<tr class="odd">
+<td>128</td>
+<td>6</td>
+<td>4</td>
+<td>2</td>
+<td>-0.115</td>
+<td>56.43</td>
+<td>0.136</td>
+</tr>
+<tr class="even">
+<td>128</td>
+<td>10</td>
+<td>4</td>
+<td>2</td>
+<td>-0.115</td>
+<td>56.59</td>
+<td>0.136</td>
+</tr>
+<tr class="odd">
+<td>256</td>
+<td>6</td>
+<td>3</td>
+<td>2</td>
+<td>-0.056</td>
+<td>63.41</td>
+<td>0.146</td>
+</tr>
+<tr class="even">
+<td>256</td>
+<td>10</td>
+<td>6</td>
+<td>3</td>
+<td><strong>-0.209</strong></td>
+<td>33.92</td>
+<td><strong>0.148</strong></td>
+</tr>
+</tbody>
+</table>
+<p>Increasing <span class="math inline">\(\nu\)</span> can <strong>improve probability silhouette</strong> while <strong>degrading hard partition quality</strong> — the soft and hard objectives pull in opposite directions.</p>
+<aside class="notes">
+<p>FPDC has an additional tuning parameter nu that controls soft-membership concentration. We tested nu=6 and nu=10 after excluding nu=2 which was unstable. For 64 and 128 dimensional embeddings, the two nu values give nearly identical results. For 256 dimensions, nu=10 gives slightly better probability silhouette but selects 6 clusters with ordinary silhouette of -0.209 — a much worse hard partition. This tension between the soft and hard objectives is an important limitation of FPDC in this setting.</p>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
+</section>
+<section id="summary-of-findings" class="slide level2">
+<h2>Summary of Findings</h2>
+<div class="columns">
+<div class="column" style="width:50%;">
+<p><strong>What worked</strong></p>
+<p>✓ RKM — strongest silhouette, highest stability, consistent 2-cluster solution across all embeddings</p>
+<p>✓ 128-dimensional embeddings — best balance of signal and noise</p>
+<p>✓ K-means and RKM agree strongly (ARI = 0.586) — same underlying structure</p>
+</div><div class="column" style="width:50%;">
+<p><strong>What didn’t</strong></p>
+<p>✗ PD — near-zero silhouette and stability throughout</p>
+<p>✗ FPDC — weak hard partitions, high runtime, sensitive to <span class="math inline">\(\nu\)</span></p>
+<p>✗ K-means elbow — selected <span class="math inline">\(k=4\)</span> with negative silhouette; selection rule matters</p>
+</div></div>
+<blockquote>
+<p>Overall: modest evidence of a <strong>weak two-group structure</strong> in user embeddings. Not strongly pronounced, but reproducible.</p>
+</blockquote>
+<aside class="notes">
+<p>To summarize: the strongest finding is that RKM on 128-dimensional embeddings consistently finds a two-cluster partition with silhouette around 0.33 and bootstrap ARI around 0.8. K-means finds the same structure but is sensitive to how you select k. The probabilistic methods did not produce competitive hard partitions in this embedding space — though FPDC does better on its own probability silhouette criterion. The overall signal is modest. There is a real two-group split in user behavior, but it is not sharply defined.</p>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
+</section>
+<section id="conclusion-and-future-work" class="slide level2">
+<h2>Conclusion and Future Work</h2>
+<p><strong>Conclusions</strong></p>
+<ul>
+<li>Learned user embeddings contain <strong>limited but real</strong> clustering structure</li>
+<li>The dominant signal is a <strong>coarse two-group split</strong> in user behavior</li>
+<li>Embedding dimension matters: <strong>128 &gt; 256 &gt; 64</strong> for cluster quality</li>
+<li>Method choice and <strong>selection rule</strong> both affect conclusions</li>
+</ul>
+<p><strong>Future directions</strong></p>
+<ul>
+<li>Spectral clustering for non-spherical structure</li>
+<li>Gaussian mixture models for overlapping elliptical groups</li>
+<li>DBSCAN / HDBSCAN for density-based detection</li>
+<li>Autoencoder or graph neural network embeddings</li>
+<li>Apply pipeline to full MovieLens 20M robustness check</li>
+</ul>
+<aside class="notes">
+<p>We close with two takeaways. First, the embeddings do contain clustering tendency, but it is weak and sensitive to modeling choices. Second, method selection rules matter as much as the methods themselves — the same K-means algorithm gave either strong or weak results depending on whether we used the elbow or silhouette to pick k. Future work should try methods better suited to non-spherical structure, and richer representations beyond the MLP approach used here.</p>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
+</section>
+<section id="thank-you" class="slide level2">
+<h2>Thank You</h2>
+<p><strong>Code and full report:</strong><br>
+<a href="https://github.com/syedalijabir/math252-project">github.com/syedalijabir/math252-project</a></p>
+<p><strong>Questions?</strong></p>
+<div class="columns">
+<div class="column" style="width:33%;">
+<p>Ali Jabir</p>
+</div><div class="column" style="width:33%;">
+<p>Isis Martínez</p>
+</div><div class="column" style="width:33%;">
+<p>Susan Peck</p>
+</div></div>
+<aside class="notes">
+<p>Thank you. We’re happy to take questions. The full report and all code are on GitHub at the link shown.</p>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
+
+</section>
+    </div>
+  <div class="quarto-auto-generated-content" style="display: none;">
+<div class="footer footer-default">
+<p>Math 252 · Dr.&nbsp;Cristina Tortora · SJSU</p>
+</div>
+</div></div>
+
+  <script>window.backupDefine = window.define; window.define = undefined;</script>
+  <script src="presentation_files/libs/revealjs/dist/reveal.js"></script>
+  <!-- reveal.js plugins -->
+  <script src="presentation_files/libs/revealjs/plugin/quarto-line-highlight/line-highlight.js"></script>
+  <script src="presentation_files/libs/revealjs/plugin/pdf-export/pdfexport.js"></script>
+  <script src="presentation_files/libs/revealjs/plugin/reveal-menu/menu.js"></script>
+  <script src="presentation_files/libs/revealjs/plugin/reveal-menu/quarto-menu.js"></script>
+  <script src="presentation_files/libs/revealjs/plugin/quarto-support/support.js"></script>
+  
+
+  <script src="presentation_files/libs/revealjs/plugin/notes/notes.js"></script>
+  <script src="presentation_files/libs/revealjs/plugin/search/search.js"></script>
+  <script src="presentation_files/libs/revealjs/plugin/zoom/zoom.js"></script>
+  <script src="presentation_files/libs/revealjs/plugin/math/math.js"></script>
+  <script>window.define = window.backupDefine; window.backupDefine = undefined;</script>
+
+  <script>
+
+      // Full list of configuration options available at:
+      // https://revealjs.com/config/
+      Reveal.initialize({
+'controlsAuto': true,
+'previewLinksAuto': false,
+'pdfSeparateFragments': false,
+'autoAnimateEasing': "ease",
+'autoAnimateDuration': 1,
+'autoAnimateUnmatched': true,
+'jumpToSlide': true,
+'menu': {"side":"left","useTextContentForMissingTitles":true,"markers":false,"loadIcons":false,"custom":[{"title":"Tools","icon":"<i class=\"fas fa-gear\"></i>","content":"<ul class=\"slide-menu-items\">\n<li class=\"slide-tool-item active\" data-item=\"0\"><a href=\"#\" onclick=\"RevealMenuToolHandlers.fullscreen(event)\"><kbd>f</kbd> Fullscreen</a></li>\n<li class=\"slide-tool-item\" data-item=\"1\"><a href=\"#\" onclick=\"RevealMenuToolHandlers.speakerMode(event)\"><kbd>s</kbd> Speaker View</a></li>\n<li class=\"slide-tool-item\" data-item=\"2\"><a href=\"#\" onclick=\"RevealMenuToolHandlers.overview(event)\"><kbd>o</kbd> Slide Overview</a></li>\n<li class=\"slide-tool-item\" data-item=\"3\"><a href=\"#\" onclick=\"RevealMenuToolHandlers.togglePdfExport(event)\"><kbd>e</kbd> PDF Export Mode</a></li>\n<li class=\"slide-tool-item\" data-item=\"4\"><a href=\"#\" onclick=\"RevealMenuToolHandlers.toggleScrollView(event)\"><kbd>r</kbd> Scroll View Mode</a></li>\n<li class=\"slide-tool-item\" data-item=\"5\"><a href=\"#\" onclick=\"RevealMenuToolHandlers.keyboardHelp(event)\"><kbd>?</kbd> Keyboard Help</a></li>\n</ul>"}],"openButton":true},
+'smaller': false,
+ 
+        // Display controls in the bottom right corner
+        controls: false,
+
+        // Help the user learn the controls by providing hints, for example by
+        // bouncing the down arrow when they first encounter a vertical slide
+        controlsTutorial: false,
+
+        // Determines where controls appear, "edges" or "bottom-right"
+        controlsLayout: 'edges',
+
+        // Visibility rule for backwards navigation arrows; "faded", "hidden"
+        // or "visible"
+        controlsBackArrows: 'faded',
+
+        // Display a presentation progress bar
+        progress: true,
+
+        // Display the page number of the current slide
+        slideNumber: 'c/t',
+
+        // 'all', 'print', or 'speaker'
+        showSlideNumber: 'all',
+
+        // Add the current slide number to the URL hash so that reloading the
+        // page/copying the URL will return you to the same slide
+        hash: true,
+
+        // Start with 1 for the hash rather than 0
+        hashOneBasedIndex: false,
+
+        // Flags if we should monitor the hash and change slides accordingly
+        respondToHashChanges: true,
+
+        // Push each slide change to the browser history
+        history: true,
+
+        // Enable keyboard shortcuts for navigation
+        keyboard: true,
+
+        // Enable the slide overview mode
+        overview: true,
+
+        // Disables the default reveal.js slide layout (scaling and centering)
+        // so that you can use custom CSS layout
+        disableLayout: false,
+
+        // Vertical centering of slides
+        center: false,
+
+        // Enables touch navigation on devices with touch input
+        touch: true,
+
+        // Loop the presentation
+        loop: false,
+
+        // Change the presentation direction to be RTL
+        rtl: false,
+
+        // see https://revealjs.com/vertical-slides/#navigation-mode
+        navigationMode: 'linear',
+
+        // Randomizes the order of slides each time the presentation loads
+        shuffle: false,
+
+        // Turns fragments on and off globally
+        fragments: true,
+
+        // Flags whether to include the current fragment in the URL,
+        // so that reloading brings you to the same fragment position
+        fragmentInURL: false,
+
+        // Flags if the presentation is running in an embedded mode,
+        // i.e. contained within a limited portion of the screen
+        embedded: false,
+
+        // Flags if we should show a help overlay when the questionmark
+        // key is pressed
+        help: true,
+
+        // Flags if it should be possible to pause the presentation (blackout)
+        pause: true,
+
+        // Flags if speaker notes should be visible to all viewers
+        showNotes: false,
+
+        // Global override for autoplaying embedded media (null/true/false)
+        autoPlayMedia: null,
+
+        // Global override for preloading lazy-loaded iframes (null/true/false)
+        preloadIframes: null,
+
+        // Number of milliseconds between automatically proceeding to the
+        // next slide, disabled when set to 0, this value can be overwritten
+        // by using a data-autoslide attribute on your slides
+        autoSlide: 0,
+
+        // Stop auto-sliding after user input
+        autoSlideStoppable: true,
+
+        // Use this method for navigation when auto-sliding
+        autoSlideMethod: null,
+
+        // Specify the average time in seconds that you think you will spend
+        // presenting each slide. This is used to show a pacing timer in the
+        // speaker view
+        defaultTiming: null,
+
+        // Enable slide navigation via mouse wheel
+        mouseWheel: false,
+
+        // The display mode that will be used to show slides
+        display: 'block',
+
+        // Hide cursor if inactive
+        hideInactiveCursor: true,
+
+        // Time before the cursor is hidden (in ms)
+        hideCursorTime: 5000,
+
+        // Opens links in an iframe preview overlay
+        previewLinks: false,
+
+        // Transition style (none/fade/slide/convex/concave/zoom)
+        transition: 'fade',
+
+        // Transition speed (default/fast/slow)
+        transitionSpeed: 'fast',
+
+        // Transition style for full page slide backgrounds
+        // (none/fade/slide/convex/concave/zoom)
+        backgroundTransition: 'none',
+
+        // Number of slides away from the current that are visible
+        viewDistance: 3,
+
+        // Number of slides away from the current that are visible on mobile
+        // devices. It is advisable to set this to a lower number than
+        // viewDistance in order to save resources.
+        mobileViewDistance: 2,
+
+        // The "normal" size of the presentation, aspect ratio will be preserved
+        // when the presentation is scaled to fit different resolutions. Can be
+        // specified using percentage units.
+        width: 1280,
+
+        height: 720,
+
+        // Factor of the display size that should remain empty around the content
+        margin: 8.0e-2,
+
+        math: {
+          mathjax: 'https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.9/MathJax.js',
+          config: 'TeX-AMS_HTML-full',
+          tex2jax: {
+            inlineMath: [['\\(','\\)']],
+            displayMath: [['\\[','\\]']],
+            balanceBraces: true,
+            processEscapes: false,
+            processRefs: true,
+            processEnvironments: true,
+            preview: 'TeX',
+            skipTags: ['script','noscript','style','textarea','pre','code'],
+            ignoreClass: 'tex2jax_ignore',
+            processClass: 'tex2jax_process'
+          },
+        },
+
+        // reveal.js plugins
+        plugins: [QuartoLineHighlight, PdfExport, RevealMenu, QuartoSupport,
+
+          RevealMath,
+          RevealNotes,
+          RevealSearch,
+          RevealZoom
+        ]
+      });
+    </script>
+    <script id="quarto-html-after-body" type="application/javascript">
+    window.document.addEventListener("DOMContentLoaded", function (event) {
+      const toggleBodyColorMode = (bsSheetEl) => {
+        const mode = bsSheetEl.getAttribute("data-mode");
+        const bodyEl = window.document.querySelector("body");
+        if (mode === "dark") {
+          bodyEl.classList.add("quarto-dark");
+          bodyEl.classList.remove("quarto-light");
+        } else {
+          bodyEl.classList.add("quarto-light");
+          bodyEl.classList.remove("quarto-dark");
+        }
+      }
+      const toggleBodyColorPrimary = () => {
+        const bsSheetEl = window.document.querySelector("link#quarto-bootstrap");
+        if (bsSheetEl) {
+          toggleBodyColorMode(bsSheetEl);
+        }
+      }
+      toggleBodyColorPrimary();  
+      const tabsets =  window.document.querySelectorAll(".panel-tabset-tabby")
+      tabsets.forEach(function(tabset) {
+        const tabby = new Tabby('#' + tabset.id);
+      });
+      const isCodeAnnotation = (el) => {
+        for (const clz of el.classList) {
+          if (clz.startsWith('code-annotation-')) {                     
+            return true;
+          }
+        }
+        return false;
+      }
+      const onCopySuccess = function(e) {
+        // button target
+        const button = e.trigger;
+        // don't keep focus
+        button.blur();
+        // flash "checked"
+        button.classList.add('code-copy-button-checked');
+        var currentTitle = button.getAttribute("title");
+        button.setAttribute("title", "Copied!");
+        let tooltip;
+        if (window.bootstrap) {
+          button.setAttribute("data-bs-toggle", "tooltip");
+          button.setAttribute("data-bs-placement", "left");
+          button.setAttribute("data-bs-title", "Copied!");
+          tooltip = new bootstrap.Tooltip(button, 
+            { trigger: "manual", 
+              customClass: "code-copy-button-tooltip",
+              offset: [0, -8]});
+          tooltip.show();    
+        }
+        setTimeout(function() {
+          if (tooltip) {
+            tooltip.hide();
+            button.removeAttribute("data-bs-title");
+            button.removeAttribute("data-bs-toggle");
+            button.removeAttribute("data-bs-placement");
+          }
+          button.setAttribute("title", currentTitle);
+          button.classList.remove('code-copy-button-checked');
+        }, 1000);
+        // clear code selection
+        e.clearSelection();
+      }
+      const getTextToCopy = function(trigger) {
+          const codeEl = trigger.previousElementSibling.cloneNode(true);
+          for (const childEl of codeEl.children) {
+            if (isCodeAnnotation(childEl)) {
+              childEl.remove();
+            }
+          }
+          return codeEl.innerText;
+      }
+      const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+        text: getTextToCopy
+      });
+      clipboard.on('success', onCopySuccess);
+      if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+        const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+          text: getTextToCopy,
+          container: window.document.getElementById('quarto-embedded-source-code-modal')
+        });
+        clipboardModal.on('success', onCopySuccess);
+      }
+        var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+        var mailtoRegex = new RegExp(/^mailto:/);
+          var filterRegex = new RegExp('/' + window.location.host + '/');
+        var isInternal = (href) => {
+            return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+        }
+        // Inspect non-navigation links and adorn them if external
+     	var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+        for (var i=0; i<links.length; i++) {
+          const link = links[i];
+          if (!isInternal(link.href)) {
+            // undo the damage that might have been done by quarto-nav.js in the case of
+            // links that we want to consider external
+            if (link.dataset.originalHref !== undefined) {
+              link.href = link.dataset.originalHref;
+            }
+          }
+        }
+      function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+        const config = {
+          allowHTML: true,
+          maxWidth: 500,
+          delay: 100,
+          arrow: false,
+          appendTo: function(el) {
+              return el.closest('section.slide') || el.parentElement;
+          },
+          interactive: true,
+          interactiveBorder: 10,
+          theme: 'light-border',
+          placement: 'bottom-start',
+        };
+        if (contentFn) {
+          config.content = contentFn;
+        }
+        if (onTriggerFn) {
+          config.onTrigger = onTriggerFn;
+        }
+        if (onUntriggerFn) {
+          config.onUntrigger = onUntriggerFn;
+        }
+          config['offset'] = [0,0];
+          config['maxWidth'] = 700;
+        window.tippy(el, config); 
+      }
+      const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+      for (var i=0; i<noterefs.length; i++) {
+        const ref = noterefs[i];
+        tippyHover(ref, function() {
+          // use id or data attribute instead here
+          let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+          try { href = new URL(href).hash; } catch {}
+          const id = href.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note) {
+            return note.innerHTML;
+          } else {
+            return "";
+          }
+        });
+      }
+      const findCites = (el) => {
+        const parentEl = el.parentElement;
+        if (parentEl) {
+          const cites = parentEl.dataset.cites;
+          if (cites) {
+            return {
+              el,
+              cites: cites.split(' ')
+            };
+          } else {
+            return findCites(el.parentElement)
+          }
+        } else {
+          return undefined;
+        }
+      };
+      var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+      for (var i=0; i<bibliorefs.length; i++) {
+        const ref = bibliorefs[i];
+        const citeInfo = findCites(ref);
+        if (citeInfo) {
+          tippyHover(citeInfo.el, function() {
+            var popup = window.document.createElement('div');
+            citeInfo.cites.forEach(function(cite) {
+              var citeDiv = window.document.createElement('div');
+              citeDiv.classList.add('hanging-indent');
+              citeDiv.classList.add('csl-entry');
+              var biblioDiv = window.document.getElementById('ref-' + cite);
+              if (biblioDiv) {
+                citeDiv.innerHTML = biblioDiv.innerHTML;
+              }
+              popup.appendChild(citeDiv);
+            });
+            return popup.innerHTML;
+          });
+        }
+      }
+    });
+    </script>
+    
+
+</body></html>
