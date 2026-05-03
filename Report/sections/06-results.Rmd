@@ -80,7 +80,7 @@ substantially higher computational cost than K-means or PD.
 
 \begin{figure}[htbp]
     \centering
-    \includegraphics[width=0.88\textwidth]{figures/figure_runtime_tradeoff.png}
+    \includegraphics[width=0.88\textwidth]{figures/figure3_runtime_vs_silhouette.png}
     \caption{Runtime and clustering quality for the final selected models.}
     \label{fig:runtime-tradeoff}
 \end{figure}

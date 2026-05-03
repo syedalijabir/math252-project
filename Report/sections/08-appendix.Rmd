@@ -4,13 +4,14 @@ The code used to reproduce all analyses, figures, and tables in this report is a
 
 ## Additional tuning diagnostics
 
-```{r fig-rkm-sensitivity, fig.cap="Reduced K-means silhouette values across candidate k and q settings."}
+```{r fig-rkm-sensitivity, fig.cap="Reduced K-means silhouette values across candidate k and q settings.", include=FALSE}
 plot_rkm_sensitivity(plot_df)
 ```
 
-## Agreement summary table
 
-```{r tbl-ari-summary}
+
+```{r tbl-ari-summary, include=FALSE}
+## Agreement summary table
 knitr::kable(
   format_ari_summary_table(ari_summary),
   booktabs = TRUE,
@@ -39,7 +40,7 @@ knitr::kable(
 \begin{figure}[htbp]
     \centering
     \includegraphics[width=\textwidth]{figures/appendix_figureA2_rkm_silhouette_vs_k_nf.png}
-    \caption{Reduced K-means silhouette values across candidate cluster counts and retained-factor settings. The strongest region lies at 2 clusters.}
+    \caption{Reduced K-means silhouette values across candidate cluster counts and retained-factor settings. The strongest region lies at 3 clusters if we look at the elbow technique, and 2 clusters if we use average silhouette width alone.}
     \label{fig:rkm-grid-appendix}
 \end{figure}
 
