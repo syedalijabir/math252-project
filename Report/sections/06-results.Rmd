@@ -8,8 +8,7 @@ the selected solutions.
 \begin{table}[htbp]
 \centering
 \small
-\caption{Best clustering result for each method and embedding dimension under the pre-specified method-specific selection criteria. Runtime is reported in seconds.}
-\label{tab:best-models}
+\caption{Best clustering result for each method and embedding dimension under the pre-specified method-specific selection criteria. Runtime is reported in seconds.\label{tab:best-models}}
 \begin{tabular}{llrrrrrrr}
 \toprule
 Method & Embedding & Clusters & Factors & $\nu$ & Runtime & Silhouette & CH index & Prob.\ silh. \\
@@ -63,8 +62,7 @@ structure but do not surpass the 128-dimensional representations.
     \centering
     \includegraphics[width=0.88\textwidth]{figures/figure3_best_silhouette_by_method_embedding.png}
     \caption{Best selected silhouette value by method and embedding dimension under the
-    pre-specified method-specific tuning rules.}
-    \label{fig:best-silhouette-by-method}
+    pre-specified method-specific tuning rules.\label{fig:best-silhouette-by-method}}
 \end{figure}
 
 Figure \ref{fig:runtime-tradeoff} compares runtime and clustering quality for the
@@ -81,8 +79,7 @@ substantially higher computational cost than K-means or PD.
 \begin{figure}[htbp]
     \centering
     \includegraphics[width=0.88\textwidth]{figures/figure3_runtime_vs_silhouette.png}
-    \caption{Runtime and clustering quality for the final selected models.}
-    \label{fig:runtime-tradeoff}
+    \caption{Runtime and clustering quality for the final selected models.\label{fig:runtime-tradeoff}}
 \end{figure}
 
 Figure \ref{fig:runtime-tradeoff} therefore serves as an empirical complexity summary:
@@ -120,8 +117,7 @@ much less stable partitions.
     \centering
     \includegraphics[width=0.85\textwidth]{figures/figure4_average_ari_by_method_pair.png}
     \caption{Average adjusted Rand index by method pair. Higher values indicate stronger
-    agreement between partitions recovered by different clustering methods.}
-    \label{fig:ari-method-pairs}
+    agreement between partitions recovered by different clustering methods.\label{fig:ari-method-pairs}}
 \end{figure}
 
 ## Stability Analysis {#sec-stability}
