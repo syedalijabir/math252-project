@@ -10,42 +10,21 @@ For PD and FPDC, we also computed probability silhouette with `Silh()` from the 
 
 For K-means, we also reported total within-cluster sum of squares because it directly reflects the K-means objective. We used the within-cluster sum of squares curve as the primary K-means tuning diagnostic and extracted the elbow from the saved fitted models. Because within-cluster sum of squares decreases monotonically as the number of clusters increases, we interpreted the elbow as a method-specific structural diagnostic rather than as a measure of cluster separation.
 
-We selected each method with a **method-specific hierarchy** of criteria shown in Table \ref{tab:tuning-summary}.
-
->\begin{table}[htbp]
-\centering
-\small
-\caption{Tuning ranges and model-selection rules for each clustering method.}
-\label{tab:tuning-summary}
-\resizebox{\textwidth}{!}{
-\begin{tabular}{lllllll}
-\toprule
-Method & Cluster-count range & Retained-factor range & \(\nu\) values tested & Primary criterion & Secondary criterion & Tertiary criterion \\
-\midrule
-K-means & 2--20 & --- & --- & WSS elbow diagnostic & Average silhouette width & Calinski--Harabasz index and bootstrap stability \\
-Reduced K-means & 2--10 & 2--6 factors & --- & Average silhouette width over all cluster/factor combinations & Calinski--Harabasz index & Bootstrap stability \\
-PD clustering & 2--5 & --- & --- & Probability silhouette & Average silhouette width & Calinski--Harabasz index \\
-FPDC & 2--8 & 2--5 factors & 2, 6, 10 & Probability silhouette over all cluster/factor/\(\nu\) combinations & Average silhouette width & Calinski--Harabasz index and bootstrap stability \\
-\bottomrule
-\end{tabular}
-}
-\end{table} <
-
+We selected each method with a **method-specific hierarchy** of criteria shown in Table \label{tab:tuning-summary}.
 
 \begin{table}[htbp]
 \centering
 \small
 \caption{Tuning ranges and model-selection rules for each clustering method.}
-\label{tab:tuning-summary}
-\resizebox{\textwidth}{!}{
+\label{tab:tuning-summary}{
 \begin{tabular}{llllll}
 \toprule
-Method & Cluster-counts & Retained-factors & $1^{st}$ criterion & $2^{nd}$ criterion & $3^{rd}$ criterion \\
+Method & k range & q range & $1^{st}$ criterion & $2^{nd}$ criterion & $3^{rd}$ criterion \\
 \midrule
-KM & 2--20 & -- &  WSS elbow diagnostic & Avg. silhouette width & CH \\
-RKM & 2--10 & 2--6 & Avg. silhouette width for all (k,q) combinations & CH & Bootstrap stability \\
-PD & 2--5 & -- & Probability silhouette & Avg. silhouette width & CH \\
-FPDC & 2--8 & 2--5 & Probability silhouette for all (k,q, $\nu$) combinations &  Silhouette width & CH index \\
+KM & 2--20 & -- &  WSS elbow diagnostic & Avg. silh. width & CH \\
+RKM & 2--10 & 2--6 & Avg. silh. width for all (k,q) combinations & CH & Stability \\
+PD & 2--5 & -- & Probability silh. & Avg. silh. width & CH \\
+FPDC & 2--8 & 2--5 & Probability silh. for all (k,q, $\nu$) combinations &  silh. width & CH index \\
 \bottomrule
 \end{tabular}
 }

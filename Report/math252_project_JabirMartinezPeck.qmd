@@ -8,7 +8,9 @@ author:
 date: "May 2, 2026"
 format:
   pdf:
-    pdf-engine: pdflatex
+    latex-auto-install: true
+    latex-tinytex: false
+    keep-tex: false
 fontsize: 11pt
 geometry: margin=1in
 header-includes:
