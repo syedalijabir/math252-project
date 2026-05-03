@@ -1,0 +1,13 @@
+# Introduction {#sec-introduction}
+
+Clustering is a core unsupervised learning technique used to identify structure in high-dimensional data without labeled outcomes. In movie-rating data, clustering offers an alternative to prediction-based recommender systems by focusing on groups of users with similar behavior rather than forecasting future ratings. Although this study is motivated by recommender-system data, it does not evaluate recommendation accuracy or predictive performance. Instead, it assesses clustering quality in learned embedding spaces. Coherent cluster structure in these embeddings may still have downstream relevance for personalization, recommendation, and content organization.
+
+The MovieLens datasets (see [Dataset section](#sec-dataset)) are widely used benchmarks in machine learning and recommender-systems research because they contain rich user–movie rating information. In this project, we cluster user embeddings learned from the rating data. We consider embedding dimensions of 64, 128, and 256 and compare four clustering methods: K-means, probabilistic distance clustering (PD), reduced K-means (RKM), and factorial probabilistic distance clustering (FPDC). The goal is to evaluate how embedding dimension and clustering method jointly affect the quality, stability, and interpretability of clustering solutions. Overall, we find only modest clustering structure in the learned embeddings, with RKM producing the strongest results and probabilistic methods yielding weaker and less stable partitions.
+
+This report is organized as follows. 
+[Section II](#sec-background) reviews the clustering methods used in the study. 
+[Section III](#sec-dataset) describes the dataset and preprocessing pipeline. 
+[Section IV](#sec-methods-and-experimental-setup) presents the embedding model and clustering implementation. 
+[Section V](#sec-evaluation-framework) defines the evaluation framework. 
+[Section VI](#sec-results) reports the experimental results. 
+[Section VII](#sec-conclusion-and-future-work) concludes and discusses future work.

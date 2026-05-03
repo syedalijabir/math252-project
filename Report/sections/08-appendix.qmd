@@ -1,0 +1,113 @@
+# Appendix {#sec-appendix}
+
+The code used to reproduce all analyses, figures, and tables in this report is available at: \url{https://github.com/syedalijabir/math252-project}
+
+## Additional tuning diagnostics
+
+```{r fig-rkm-sensitivity, fig.cap="Reduced K-means silhouette values across candidate k and q settings.", include=FALSE}
+plot_rkm_sensitivity(plot_df)
+```
+
+
+
+```{r tbl-ari-summary, include=FALSE}
+## Agreement summary table
+knitr::kable(
+  format_ari_summary_table(ari_summary),
+  booktabs = TRUE,
+  caption = "Summary of pairwise adjusted Rand index values across method pairs."
+)
+```
+
+
+<!-- \begin{figure}[htbp]
+    \centering
+    \includegraphics[width=\textwidth]{figures/figure1_kmeans_macqueen_silhouette_vs_k.pdf}
+    \caption{Average silhouette width across candidate cluster counts for MacQueen K-means. Silhouette peaks at 2 clusters in all three embedding dimensions, even though the elbow diagnostic selects 4 clusters.}
+    \label{fig-kmeans-silhouette-k}
+\end{figure} -->
+
+
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=\textwidth]{figures/appendix_figureA1_kmeans_wss_vs_k_cleaned.png}
+    \caption{Within-cluster sum of squares for MacQueen K-means across candidate cluster counts. The elbow diagnostic selects 4 clusters in all three embedding dimensions.}
+    \label{fig-kmeans-wss-appendix}
+\end{figure}
+
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=\textwidth]{figures/appendix_figureA2_rkm_silhouette_vs_k_nf.png}
+    \caption{Reduced K-means silhouette values across candidate cluster counts and retained-factor settings. The strongest region lies at 3 clusters if we look at the elbow technique, and 2 clusters if we use average silhouette width alone.}
+    \label{fig-rkm-grid-appendix}
+\end{figure}
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=\textwidth]{figures/appendix_figureA3_probability_silhouette_pd_fpdc.png}
+    \caption{Best probability silhouette across candidate cluster counts for PD clustering and FPDC. FPDC improves the soft-membership diagnostic relative to PD, but it still does not produce a strong hard partition.}
+    \label{fig-prob-silhouette-appendix}
+\end{figure}
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=\textwidth]{figures/kmeans-stability.png}
+    \caption{Bootstrap stability for K-means across embedding dimensions and cluster counts.}
+    \label{fig-kmeans-stability}
+\end{figure}
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=\textwidth]{figures/rkm-stability.png}
+    \caption{Bootstrap stability for Reduced K-means across embedding dimensions and cluster counts.}
+    \label{fig-rkm-stability}
+\end{figure}
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=\textwidth]{figures/pd-stability.png}
+    \caption{Bootstrap stability for PD clustering across embedding dimensions and cluster counts.}
+    \label{fig-pd-stability}
+\end{figure}
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=\textwidth]{figures/fpdc-stability.png}
+    \caption{Bootstrap stability for FPDC across embedding dimensions and cluster counts.}
+    \label{fig-fpdc-stability}
+\end{figure}
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.78\textwidth]{figures/TuckerFactor.png}
+    \caption{Tucker-factor diagnostic for the learned embeddings. The diagnostic increases smoothly as the number of retained factors grows and does not show a sharp elbow, which supports a compact retained-factor search range.}
+    \label{fig-tucker-factor}
+\end{figure}
+
+
+\begin{table}[htbp]
+\centering
+\small
+\caption{FPDC sensitivity to the tuning parameter \(\nu\). Each row reports the best FPDC model within a fixed \(\nu\) value after excluding the inconsistent \(\nu=2\) pilot runs.}
+\label{tbl-fpdc-nu-sensitivity}
+\resizebox{\textwidth}{!}{
+\begin{tabular}{rrrrrrrr}
+\toprule
+Embedding dimension & \(\nu\) & Clusters & Retained factors & Runtime (s) & Average Silhouette Width & Calinski--Harabasz index & Probability Silhouette \\
+\midrule
+64  & 6  & 2 & 4 & 241.74 & 0.012  & 70.55 & 0.143 \\
+64  & 10 & 2 & 4 & 77.76  & 0.012  & 69.93 & 0.143 \\
+128 & 6  & 4 & 2 & 188.16 & -0.115 & 56.43 & 0.136 \\
+128 & 10 & 4 & 2 & 69.08  & -0.115 & 56.59 & 0.136 \\
+256 & 6  & 3 & 2 & 170.20 & -0.056 & 63.41 & 0.146 \\
+256 & 10 & 6 & 3 & 70.74  & -0.209 & 33.92 & 0.148 \\
+\bottomrule
+\end{tabular}
+}
+\end{table}
+
+
+
+

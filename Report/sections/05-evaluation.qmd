@@ -1,0 +1,53 @@
+# Test Setup and Evaluation {#sec-evaluation-framework}
+
+Because the analysis has no ground-truth labels, we evaluated the clustering results with internal validation metrics, bootstrap stability, partition agreement, empirical runtime, and interpretability rather than external criteria.
+
+## Internal Validation Metrics
+
+We used **average silhouette** [@kaufman1990finding] width as the main hard-clustering diagnostic for K-means and RKM. Silhouette width measures how much closer each user lies to its assigned cluster than to the nearest competing cluster, so larger values indicate better-separated and more coherent clusters. We used the **Calinski-Harabasz** (CH) index as a second hard-clustering diagnostic because it rewards high between-cluster dispersion and low within-cluster dispersion.
+
+For PD and FPDC, we also computed probability silhouette with `Silh()` from the `FPDclustering` package [@tortora2024fpdclustering]. Probability silhouette respects soft memberships and therefore aligns more closely with the probabilistic objective than ordinary silhouette alone. We still report ordinary silhouette and the Calinski-Harabasz index for those methods so that we can compare the soft-clustering methods with the hard-clustering methods on a common scale.
+
+For K-means, we also reported total within-cluster sum of squares because it directly reflects the K-means objective. We used the within-cluster sum of squares curve as the primary K-means tuning diagnostic and extracted the elbow from the saved fitted models. Because within-cluster sum of squares decreases monotonically as the number of clusters increases, we interpreted the elbow as a method-specific structural diagnostic rather than as a measure of cluster separation.
+
+We selected each method with a **method-specific hierarchy** of criteria shown in Table \ref{tbl-tuning-summary}.
+
+\begin{table}[htbp]
+\centering
+\small
+\caption{Tuning ranges and model-selection rules for each clustering method.}
+\label{tbl-tuning-summary}
+\resizebox{\textwidth}{!}{
+\begin{tabular}{llllll}
+\toprule
+Method & Cluster-counts & Retained-factors & $1^{st}$ criterion & $2^{nd}$ criterion & $3^{rd}$ criterion \\
+\midrule
+KM & 2--20 & -- &  WSS elbow diagnostic & Avg. silhouette width & CH \\
+RKM & 2--10 & 2--6 & Avg. silhouette width for all (k,q) combinations & CH & Bootstrap stability \\
+PD & 2--5 & -- & Probability silhouette & Avg. silhouette width & CH \\
+FPDC & 2--8 & 2--5 & Probability silhouette for all (k,q, $\nu$) combinations &  Silhouette width & CH index \\
+\bottomrule
+\end{tabular}
+}
+\end{table}
+
+
+## Stability
+
+We assessed bootstrap stability with 15 bootstrap replicates for each combination of method, embedding dimension, and cluster count [@everitt2011cluster]. In each replicate, we sampled 30\% of users with replacement, refit the clustering model on the bootstrap sample, and compared the resulting partition with the full-data reference partition by adjusted Rand index (ARI) [@kaufman1990finding]. Adjusted Rand index ranges from 0 for chance-level agreement to 1 for perfect agreement, so larger values indicate more reproducible solutions. For PD and FPDC, we converted soft memberships to hard labels by assigning each user to the cluster with the highest membership probability before computing adjusted Rand index.
+
+We also compared the final partitions across methods with pairwise adjusted Rand indices computed within matched embedding dimensions and matched cluster counts. This comparison tells us whether different methods recover the same underlying structure or fundamentally different partitions.
+
+## Runtime and Computational Cost
+
+We recorded wall-clock runtime for every cached model fit and used runtime as an empirical measure of computational complexity. K-means and PD mainly scale with repeated distance calculations between users and cluster centers, so they remain comparatively fast. RKM adds the cost of estimating and rotating a lower-dimensional subspace. FPDC adds both subspace estimation and iterative soft-membership updates, and it also tunes $\nu$. We therefore interpreted runtime jointly with fit quality: a more complex method should deliver a clear gain in clustering quality if it is going to justify higher computational cost.
+
+## Implementation Summary
+
+Table \ref{tbl-tuning-summary} summarizes the tuning grids and selection rules. The methods use different parameter ranges because they solve different optimization problems and incur different computational costs. K-means only tunes the number of clusters, so it can support a broad cluster-count range and a full elbow diagnostic. RKM and FPDC tune both cluster counts and retained factors, so their search grids grow much more quickly. FPDC also tunes $\nu$, which further expands the search space. The Tucker-factor diagnostics increased smoothly with the number of retained factors and did not show a sharp elbow, so we treated large retained-factor values as offering only incremental gains. That pattern justified a slightly broader retained-factor range for RKM and a more compact retained-factor range for FPDC.
+
+All methods were applied to standardized embedding matrices of dimensions 64, 128, and 256. For K-means, WSS elbow plots were used as a method-specific tuning diagnostic, and the final value of $k$ was determined using silhouette width, the Calinski-Harabasz index, and bootstrap stability when the elbow was weak or ambiguous. For RKM, $k$ and the reduced dimension $q$ were selected jointly over a two-dimensional grid using silhouette as the primary criterion and CH as a secondary check. For the probabilistic methods, model selection emphasized probability silhouette because PD and FPDC produce soft cluster memberships. Accordingly, PD models were selected over $k$ using probability silhouette as the primary criterion, with ordinary silhouette and CH used as supporting diagnostics, while FPDC models were selected over $(k, q, \nu)$ using the same hierarchy. Intermediate results were cached to R Data Serialization or `.rds` files to support reproducibility without rerunning the full pipeline during rendering. The tuning ranges and selection criteria for each method are summarized in Table \ref{tbl-tuning-summary}.
+
+
+
+
