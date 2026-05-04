@@ -136,19 +136,51 @@ sparse matrix; always on the dense embeddings.
 
 ------------------------------------------------------------------------
 
-## Evaluation Framework {.smaller}
+## Evaluation Framework
 
 Because there are **no ground-truth labels**, evaluation uses four
 complementary approaches:
-
-| Criterion         | Metric                        | Methods       |
-|-------------------|-------------------------------|---------------|
-| Internal validity | Average silhouette width      | All four      |
-| Internal validity | CH index                      | All four      |
-| Internal validity | Probability silhouette        | PD, FPDC only |
-| Stability         | Bootstrap ARI (15 reps, 30% ) | All four      |
-| Agreement         | Pairwise ARI across methods   | All four      |
-| Efficiency        | Wall-clock runtime            | All four      |
+<table style="font-size:0.85em; width:100%; border-collapse:collapse;">
+<thead>
+<tr>
+  <th>Criterion</th>
+  <th>Metric</th>
+  <th>Methods</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td>Internal validity</td>
+  <td>Average silhouette width</td>
+  <td>All four</td>
+</tr>
+<tr>
+  <td>Internal validity</td>
+  <td>CH index</td>
+  <td>All four</td>
+</tr>
+<tr>
+  <td>Internal validity</td>
+  <td>Probability silhouette</td>
+  <td>PD, FPDC only</td>
+</tr>
+<tr>
+  <td>Stability</td>
+  <td>Bootstrap ARI (15 reps, 30%)</td>
+  <td>All four</td>
+</tr>
+<tr>
+  <td>Agreement</td>
+  <td>Pairwise ARI across methods</td>
+  <td>All four</td>
+</tr>
+<tr>
+  <td>Efficiency</td>
+  <td>Wall-clock runtime</td>
+  <td>All four</td>
+</tr>
+</tbody>
+</table>
 
 ::: notes
 Since we have no labels, we can't compute accuracy. Instead we assess
@@ -202,23 +234,69 @@ cached so the report renders without re-running the full pipeline.
 ## Best Selected Models {.smaller}
 
 ```{=html}
-<table style="font-size:0.78em; width:100%">
+<table style="font-size:0.72em; width:100%; border-collapse:collapse;">
 <thead>
-<tr><th>Method</th><th>Embedding</th><th>k</th><th>q</th><th>ν</th><th>Runtime (s)</th><th>Silhouette</th><th>CH</th><th>Prob. silh.</th></tr>
+<tr>
+  <th>Method</th><th>Embedding</th><th>k</th><th>q</th><th>ν</th>
+  <th>Runtime (s)</th><th>Silhouette</th><th>CH</th><th>Prob. silh.</th>
+</tr>
 </thead>
 <tbody>
-<tr style="background:#f5f5f5"><td>K-means</td><td>64</td><td>4</td><td>—</td><td>—</td><td>7.35</td><td>-0.011</td><td>96.96</td><td>—</td></tr>
-<tr style="background:#f5f5f5"><td>PD</td><td>64</td><td>2</td><td>—</td><td>—</td><td>0.29</td><td>0.003</td><td>10.14</td><td>0.093</td></tr>
-<tr style="background:#e8f4e8"><td><b>RKM</b></td><td>64</td><td>2</td><td>2</td><td>—</td><td>278.90</td><td><b>0.235</b></td><td>132.29</td><td>—</td></tr>
-<tr style="background:#f5f5f5"><td>FPDC</td><td>64</td><td>2</td><td>4</td><td>6</td><td>241.74</td><td>0.012</td><td>70.55</td><td>0.143</td></tr>
-<tr style="background:#f5f5f5"><td>K-means</td><td>128</td><td>4</td><td>—</td><td>—</td><td>12.72</td><td>-0.010</td><td>91.21</td><td>—</td></tr>
-<tr style="background:#f5f5f5"><td>PD</td><td>128</td><td>2</td><td>—</td><td>—</td><td>0.18</td><td>0.000</td><td>0.92</td><td>0.068</td></tr>
-<tr style="background:#c8e6c9"><td><b>RKM</b></td><td><b>128</b></td><td>2</td><td>4</td><td>—</td><td>184.10</td><td><b>0.331</b></td><td>139.52</td><td>—</td></tr>
-<tr style="background:#f5f5f5"><td>FPDC</td><td>128</td><td>4</td><td>2</td><td>6</td><td>188.16</td><td>-0.115</td><td>56.43</td><td>0.136</td></tr>
-<tr style="background:#f5f5f5"><td>K-means</td><td>256</td><td>4</td><td>—</td><td>—</td><td>23.45</td><td>0.026</td><td>74.77</td><td>—</td></tr>
-<tr style="background:#f5f5f5"><td>PD</td><td>256</td><td>2</td><td>—</td><td>—</td><td>0.26</td><td>0.000</td><td>1.07</td><td>0.062</td></tr>
-<tr style="background:#e8f4e8"><td><b>RKM</b></td><td>256</td><td>2</td><td>5</td><td>—</td><td>257.64</td><td><b>0.290</b></td><td>111.25</td><td>—</td></tr>
-<tr style="background:#f5f5f5"><td>FPDC</td><td>256</td><td>6</td><td>3</td><td>10</td><td>70.74</td><td>-0.209</td><td>33.92</td><td>0.148</td></tr>
+
+<!-- 64 -->
+<tr style="background:#d9d9d9; border-top:3px solid black;">
+  <td>K-means</td><td><b>64</b></td><td>4</td><td>—</td><td>—</td>
+  <td>7.35</td><td>-0.011</td><td>96.96</td><td>—</td>
+</tr>
+<tr style="background:#d9d9d9;">
+  <td>PD</td><td>64</td><td>2</td><td>—</td><td>—</td>
+  <td>0.29</td><td>0.003</td><td>10.14</td><td>0.093</td>
+</tr>
+<tr style="background:#d9d9d9;">
+  <td>RKM</td><td>64</td><td>2</td><td>2</td><td>—</td>
+  <td>278.90</td><td>0.235</td><td>132.29</td><td>—</td>
+</tr>
+<tr style="background:#d9d9d9; border-bottom:3px solid black;">
+  <td>FPDC</td><td>64</td><td>2</td><td>4</td><td>6</td>
+  <td>241.74</td><td>0.012</td><td>70.55</td><td>0.143</td>
+</tr>
+
+<!-- 128 -->
+<tr style="background:#ffffff; border-top:3px solid black;">
+  <td>K-means</td><td><b>128</b></td><td>4</td><td>—</td><td>—</td>
+  <td>12.72</td><td>-0.010</td><td>91.21</td><td>—</td>
+</tr>
+<tr style="background:#ffffff;">
+  <td>PD</td><td>128</td><td>2</td><td>—</td><td>—</td>
+  <td>0.18</td><td>0.000</td><td>0.92</td><td>0.068</td>
+</tr>
+<tr style="background:#c8e6c9;">
+  <td><b>RKM</b></td><td><b>128</b></td><td><b>2</b></td><td><b>4</b></td><td>—</td>
+  <td><b>184.10</b></td><td><b>0.331</b></td><td><b>139.52</b></td><td>—</td>
+</tr>
+<tr style="background:#ffffff; border-bottom:3px solid black;">
+  <td>FPDC</td><td>128</td><td>4</td><td>2</td><td>6</td>
+  <td>188.16</td><td>-0.115</td><td>56.43</td><td>0.136</td>
+</tr>
+
+<!-- 256 -->
+<tr style="background:#d9d9d9; border-top:3px solid black;">
+  <td>K-means</td><td><b>256</b></td><td>4</td><td>—</td><td>—</td>
+  <td>23.45</td><td>0.026</td><td>74.77</td><td>—</td>
+</tr>
+<tr style="background:#d9d9d9;">
+  <td>PD</td><td>256</td><td>2</td><td>—</td><td>—</td>
+  <td>0.26</td><td>0.000</td><td>1.07</td><td>0.062</td>
+</tr>
+<tr style="background:#d9d9d9;">
+  <td>RKM</td><td>256</td><td>2</td><td>5</td><td>—</td>
+  <td>257.64</td><td>0.290</td><td>111.25</td><td>—</td>
+</tr>
+<tr style="background:#d9d9d9; border-bottom:3px solid black;">
+  <td>FPDC</td><td>256</td><td>6</td><td>3</td><td>10</td>
+  <td>70.74</td><td>-0.209</td><td>33.92</td><td>0.148</td>
+</tr>
+
 </tbody>
 </table>
 ```
@@ -324,7 +402,7 @@ confirming the internal validity results.
 ::: notes
 FPDC has an additional tuning parameter nu that controls soft-membership
 concentration. We tested nu=6 and nu=10 after excluding nu=2 which was
-unstable. For 64 and 128 dimensional embeddings, the two nu values give
+unstable. For 64 and 128-dimensional embeddings, the two nu values give
 nearly identical results. For 256 dimensions, nu=10 gives slightly
 better probability silhouette but selects 6 clusters with ordinary
 silhouette of -0.209 — a much worse hard partition. This tension between
@@ -344,24 +422,23 @@ in opposite directions.
 ::: {.column width="50%"}
 **What worked**
 
-✓ RKM — strongest silhouette, highest stability, consistent 2-cluster
+✓ RKM:  strongest silhouette, highest stability, consistent 2-cluster
 solution across all embeddings
 
-✓ 128-dimensional embeddings — best balance of signal and noise
+✓ 128-dimensional embeddings:  best balance of signal and noise
 
-✓ K-means and RKM agree strongly (ARI = 0.586) — same underlying
+✓ K-means and RKM tend to agree with a similar underlying
 structure
 :::
 
 ::: {.column width="50%"}
 **What didn't**
 
-✗ PD — near-zero silhouette and stability throughout
+✗ PD:  near-zero silhouette and stability throughout
 
-✗ FPDC — weak hard partitions, high runtime, sensitive to $\nu$
+✗ FPDC:  high runtime, sensitive to $\nu$
 
-✗ K-means elbow — selected $k=4$ with negative silhouette; selection
-rule matters
+✗ K-means:  elbow selected $k=4$ with negative silhouette
 :::
 :::::
 
