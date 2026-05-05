@@ -1,100 +1,563 @@
 ---
 title: "Reel Intelligence: MovieLens Clustering"
-subtitle: "Final Project Report, Spring 2026"
-author:
-  - Ali Jabir
-  - Isis Martínez
-  - Susan Peck
-date: "May 2, 2026"
+subtitle: "Do learned user embeddings reveal meaningful audience segments?"
+author: "Ali Jabir · Isis Martínez · Susan Peck"
+institute: "Math 252 Spring 2026 · San Jose State University"
 format:
-  pdf:
-    latex-auto-install: true
-    latex-tinytex: false
-    keep-tex: false
-fontsize: 11pt
-geometry: margin=1in
-header-includes:
-  - \usepackage{amsmath}
-  - \usepackage{amssymb}
-  - \usepackage{booktabs}
-  - \usepackage{longtable}
-  - \usepackage{array}
-  - \usepackage{float}
-  - \usepackage{setspace}
-  - \usepackage{graphicx}
-  - \usepackage{caption}
-  - \usepackage{hyperref}
-bibliography: refs.bib
+  revealjs:
+    theme: [simple, custom.scss]
+    slide-number: true
+    fig-align: center
+    fig-cap-location: bottom
+    code-fold: false
+    incremental: false
+    transition: fade
+    transition-speed: fast
+    width: 1280
+    height: 720
+    margin: 0.08
+    highlight-style: github
+execute:
+  echo: false
+  warning: false
+  message: false
+editor:
+  markdown:
+    wrap: 72
 ---
 
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(
-  echo = FALSE,
-  warning = FALSE,
-  message = FALSE,
-  fig.width = 8,
-  fig.height = 5.5,
-  dpi = 120
-)
+## Are users naturally grouped in embedding space?
 
-library(dplyr)
-library(ggplot2)
-library(knitr)
-library(scales)
+::: {.takeaway}
+We ask whether MovieLens user behavior forms meaningful clusters after
+compressing sparse ratings into learned embeddings.
+:::
 
+::::: columns
+::: {.column width="58%"}
+**Not prediction:** we are not evaluating recommendation accuracy.
 
-source("compare_results_helpers.R")
+**Instead:** we test whether learned user representations contain stable,
+interpretable clustering structure.
+:::
 
-compare_results <- build_compare_results_data(
-  cache_root = file.path("..", "output", "benchmark_cache")
-)
+::: {.column width="42%"}
+::: {.question-card}
+Are audience segments visible in the geometry of user embeddings?
+:::
+:::
+:::::
 
-plot_df <- compare_results$plot_df
-best_models_df <- compare_results$best_models_df
-best_table <- compare_results$best_table
-overall_best <- compare_results$overall_best
-ari_df <- compare_results$ari_df
-ari_summary <- compare_results$ari_summary
-```
+::: notes
+This project is motivated by recommender systems, but the task is not to
+predict ratings. The question is whether user behavior contains meaningful
+group structure after we represent each user with a learned embedding.
+Because there are no true cluster labels, the presentation focuses on
+internal validity, stability, agreement, and runtime.
+:::
 
+---
 
-\begin{center}
-\textbf{Clustering Analysis (Math 252)}\\
-Professor: Dr. Cristina Tortora\\
-Department of Statistics\\
-San Jose State University
-\end{center}
+## Ratings become embeddings, then clusters
 
-# Abstract
+::: {.pipeline}
+::: {.pipe-step}MovieLens ratings:::
+::: {.pipe-arrow}→:::
+::: {.pipe-step}User–item matrix:::
+::: {.pipe-arrow}→:::
+::: {.pipe-step}MLP embeddings:::
+::: {.pipe-arrow}→:::
+::: {.pipe-step}Clustering:::
+::: {.pipe-arrow}→:::
+::: {.pipe-step}Validation:::
+:::
 
-This study evaluates clustering structure in user embeddings learned from the MovieLens 1M dataset. We generate embeddings using a multilayer perceptron and examine three embedding dimensions (64, 128, and 256). Four clustering methods are compared: k-means, probabilistic distance (PD) clustering, reduced k-means, and factorial probabilistic distance clustering (FPDC). Because no ground-truth labels are available, evaluation is based on internal validation metrics, bootstrap stability, partition agreement, and runtime.
+::::: columns
+::: {.column width="33%"}
+::: {.metric-card}
+<span class="metric">~1M</span>  
+ratings
+:::
+:::
 
-The results provide only modest evidence of clustering structure in the learned embeddings. Reduced K-means produces the strongest and most consistent hard partitions, particularly in the 128-dimensional embedding space. K-means recovers similar structure but is sensitive to the choice of tuning criterion. In contrast, PD clustering and FPDC do not yield stable or well-separated partitions under the evaluation framework used in this study. Across methods, the 128-dimensional embeddings provide the clearest clustering signal.
+::: {.column width="33%"}
+::: {.metric-card}
+<span class="metric">6,040</span>  
+users
+:::
+:::
 
-Overall, the findings suggest that while embedding-based representations of user behavior contain some clustering tendency, the resulting structure is weak and sensitive to modeling choices, limiting strong interpretation of distinct user groups.
+::: {.column width="33%"}
+::: {.metric-card}
+<span class="metric">3,706</span>  
+movies
+:::
+:::
+:::::
 
-```{r child="sections/01-introduction.Rmd"}
-```
+::: {.takeaway}
+We compare embedding dimensions of **64**, **128**, and **256**.
+:::
 
-```{r child="sections/02-background.Rmd"}
-```
+::: notes
+The data start as sparse user–movie ratings. We convert them into a
+user–item matrix, learn dense user embeddings with a neural network, and
+then cluster users in each embedding space. The MovieLens 1M dataset has
+about one million ratings, 6,040 users, and 3,706 movies.
+:::
 
-```{r child="sections/03-dataset.Rmd"}
-```
+---
 
-```{r child="sections/04-methods.Rmd"}
-```
+## The MLP creates dense user representations
 
-```{r child="sections/05-evaluation.Rmd"}
-```
+::::: columns
+::: {.column width="52%"}
+::: {.compact-list}
+1. Build sparse user–item matrix: **6040 × 3706**
+2. Mean-center by movie
+3. Impute missing ratings with zero
+4. Train MLP and output **64D**, **128D**, **256D** embeddings
+:::
 
-```{r child="sections/06-results.Rmd"}
-```
+::: {.takeaway}
+Clustering is performed on embeddings, not on the raw sparse ratings.
+:::
+:::
 
-```{r child="sections/07-conclusion.Rmd"}
-```
+::: {.column width="48%"}
+![](figures/mlp_architecture.png){width="82%"}
+:::
+:::::
 
-```{r child="sections/08-appendix.Rmd"}
-```
+::: notes
+The input to the MLP is a 3,706-dimensional user vector. A hidden layer
+of size 512 compresses the rating information, and the output layer gives
+the final embedding. We trained separate embedding models for 64, 128,
+and 256 dimensions to test whether representation size changes the
+strength of the clustering signal.
+:::
 
-# References
+---
+
+## The methods form a 2 × 2 design
+
+::: {.method-grid}
+::: {.grid-head}
+:::
+::: {.grid-head}
+**Hard assignment**
+:::
+::: {.grid-head}
+**Probabilistic assignment**
+:::
+
+::: {.grid-side}
+**Full embedding space**
+:::
+::: {.method-card}
+**K-means**  
+Fast baseline; minimizes within-cluster variation.
+:::
+::: {.method-card}
+**Probabilistic distance clustering**  
+Soft memberships based on distance to centers.
+:::
+
+::: {.grid-side}
+**Learned subspace**
+:::
+::: {.method-card .accent-border}
+**Reduced K-means**  
+Hard clusters after learning a clustering-relevant subspace.
+:::
+::: {.method-card}
+**Factorial PD**  
+Soft clustering with dimension reduction.
+:::
+:::
+
+::: {.takeaway}
+The comparison separates two choices: **assignment type** and
+**representation space**.
+:::
+
+::: notes
+K-means and Reduced K-means assign each user to one cluster. PD and FPDC
+allow partial membership across clusters. RKM and FPDC also estimate a
+lower-dimensional subspace, which can help if the cluster structure is
+hidden inside a smaller set of directions.
+:::
+
+---
+
+## No labels, so we triangulate
+
+::::: columns
+::: {.column width="50%"}
+::: {.metric-card}
+**Internal validity**  
+Silhouette width and CH index
+:::
+
+::: {.metric-card}
+**Soft assignment quality**  
+Probability silhouette for PD and FPDC
+:::
+:::
+
+::: {.column width="50%"}
+::: {.metric-card}
+**Stability**  
+Bootstrap ARI with 15 replicates
+:::
+
+::: {.metric-card}
+**Practicality**  
+Wall-clock runtime
+:::
+:::
+:::::
+
+::: {.muted}
+ARI = adjusted Rand index. Higher values mean stronger agreement between
+partitions.
+:::
+
+::: notes
+Because there are no ground-truth labels, there is no accuracy score.
+Silhouette checks whether users are closer to their own cluster than to a
+competing cluster. CH rewards compact, separated clusters. Probability
+silhouette is used for soft methods. Bootstrap ARI measures whether a
+partition reappears under resampling, and runtime tells us whether a
+more complex method is worth the cost.
+:::
+
+---
+
+## Best overall: RKM on 128D embeddings
+
+::: {.winner-card}
+::: {.winner-title}
+Reduced K-means
+:::
+
+::::: columns
+::: {.column width="25%"}
+<span class="metric big">128D</span>  
+embedding
+:::
+
+::: {.column width="25%"}
+<span class="metric big">k = 2</span>  
+clusters
+:::
+
+::: {.column width="25%"}
+<span class="metric big">q = 4</span>  
+factors
+:::
+
+::: {.column width="25%"}
+<span class="metric big">0.331</span>  
+silhouette
+:::
+:::::
+
+::: {.winner-footer}
+CH index = **139.52**
+:::
+:::
+
+::: {.takeaway}
+This was the clearest evidence of clustering, but the structure is still
+only modest.
+:::
+
+::: notes
+The best selected solution was Reduced K-means on the 128-dimensional
+embedding. It selected two clusters and four retained factors, with a
+silhouette of 0.331 and a CH index of 139.52. This is the strongest
+result in the study, but the value is not high enough to claim sharply
+separated user groups.
+:::
+
+---
+
+## RKM gives the clearest separation
+
+::::: columns
+::: {.column width="68%"}
+![](figures/figure3_best_silhouette_by_method_embedding.png){width="92%"}
+:::
+
+::: {.column width="32%"}
+::: {.compact-list}
+- **RKM leads** in all embedding sizes.
+- **128D** gives the strongest signal.
+- PD and FPDC are near zero or negative for hard partitions.
+:::
+:::
+:::::
+
+::: notes
+This figure summarizes the selected silhouette values. RKM is the clear
+winner, especially at 128 dimensions. K-means looks weak here because the
+WSS elbow selected four clusters, which had poor separation. PD and FPDC
+do not produce strong hard partitions.
+:::
+
+---
+
+## Higher complexity only pays off for RKM
+
+::::: columns
+::: {.column width="68%"}
+![](figures/figure3_runtime_vs_silhouette.png){width="90%"}
+:::
+
+::: {.column width="32%"}
+::: {.legend-card}
+**PD:** fast but weak  
+**K-means:** fast, tuning-sensitive  
+**RKM:** slower, strongest quality  
+**FPDC:** costly without hard-partition gains
+:::
+:::
+:::::
+
+::: notes
+The ideal method would be high on the y-axis and far left on the x-axis.
+PD is very fast but has silhouette values near zero. K-means is also
+fast, but its selected result depends heavily on the tuning rule. RKM is
+more expensive, but it is the only method with a clear gain in
+hard-clustering quality. FPDC costs more without producing a strong hard
+partition.
+:::
+
+---
+
+## K-means and RKM recover related structure
+
+::::: columns
+::: {.column width="67%"}
+![](figures/figure4_average_ari_by_method_pair.png){width="86%"}
+:::
+
+::: {.column width="33%"}
+::: {.metric-card}
+<span class="metric">0.586</span>  
+average ARI for K-means vs RKM
+:::
+
+::: {.compact-list}
+- K-means and RKM find related partitions.
+- Pairs involving PD or FPDC are near zero.
+:::
+:::
+:::::
+
+::: notes
+Pairwise ARI compares final partitions across methods. K-means and RKM
+have the strongest agreement, with an average ARI of 0.586. That means
+they recover a related underlying structure. Comparisons involving PD or
+FPDC are close to zero, suggesting those methods are finding different
+and less reliable partitions.
+:::
+
+---
+
+## The two-cluster signal is the most stable
+
+![](figures/stability_all_methods_by_embedding.png){width="88%"}
+
+::: {.takeaway}
+K-means and RKM are most stable at **k = 2**; stability drops for larger
+cluster counts.
+:::
+
+::: notes
+The bootstrap analysis compares each resampled partition to the full-data
+reference solution. K-means and RKM show the strongest stability at two
+clusters, especially in the larger embedding spaces. Stability falls as
+the number of clusters increases. PD and FPDC remain near zero, which
+supports the conclusion that they do not recover stable hard partitions.
+:::
+
+---
+
+## What worked — and what did not
+
+::::: columns
+::: {.column width="50%"}
+::: {.two-column-card .worked}
+**What worked**
+
+✓ Reduced K-means  
+✓ 128D embeddings  
+✓ Coarse two-cluster structure  
+✓ K-means/RKM agreement
+:::
+:::
+
+::: {.column width="50%"}
+::: {.two-column-card .not-worked}
+**What did not**
+
+✗ PD hard partitions  
+✗ FPDC hard partitions  
+✗ K-means elbow rule  
+✗ Overly complex solutions
+:::
+:::
+:::::
+
+::: {.takeaway}
+The useful signal is real enough to reproduce, but not strong enough for
+sharp audience segmentation.
+:::
+
+::: notes
+The strongest evidence comes from RKM, especially in the 128-dimensional
+embedding space. K-means supports the same general structure, but only
+when we account for the tuning-rule issue. PD and FPDC do not provide
+competitive hard partitions in this setting.
+:::
+
+---
+
+## MovieLens embeddings show weak but reproducible structure
+
+::::: columns
+::: {.column width="33%"}
+::: {.metric-card}
+**Best model**  
+RKM, 128D, k = 2
+:::
+:::
+
+::: {.column width="33%"}
+::: {.metric-card}
+**Main signal**  
+Coarse two-group split
+:::
+:::
+
+::: {.column width="33%"}
+::: {.metric-card}
+**Caution**  
+Weak separation and tuning sensitivity
+:::
+:::
+:::::
+
+::: {.compact-list}
+**Future work:** spectral clustering, Gaussian mixture models,
+HDBSCAN, autoencoder or graph neural network embeddings, and MovieLens
+20M robustness checks.
+:::
+
+::: notes
+The conclusion is intentionally cautious. The embeddings contain some
+clustering tendency, but the groups are weakly separated and sensitive to
+modeling choices. The next step would be to test methods better suited to
+non-spherical or overlapping structure and to use richer representation
+learning approaches.
+:::
+
+---
+
+## Thank you
+
+::: {.thank-you}
+**Questions?**
+:::
+
+**Code and full report:**  
+[github.com/syedalijabir/math252-project](https://github.com/syedalijabir/math252-project)
+
+::::: columns
+::: {.column width="33%"}
+Ali Jabir
+:::
+
+::: {.column width="33%"}
+Isis Martínez
+:::
+
+::: {.column width="33%"}
+Susan Peck
+:::
+:::::
+
+::: notes
+Thank you. We are happy to take questions. The full report and code are
+available at the GitHub link shown.
+:::
+
+---
+
+## Backup: parameter search grids {.backup}
+
+| Method  | k range | q range | ν     | Primary criterion              |
+|---------|---------|---------|-------|--------------------------------|
+| K-means | 2–20    | —       | —     | WSS elbow → silhouette, CH     |
+| RKM     | 2–10    | 2–6     | —     | Silhouette, CH tiebreaker      |
+| PD      | 2–5     | —       | —     | Probability silhouette         |
+| FPDC    | 2–8     | 2–5     | 6, 10 | Probability silhouette         |
+
+::: {.muted}
+All fitted models and tuning results were cached to `.rds` files.
+:::
+
+::: notes
+This backup slide gives the full tuning setup. K-means only tunes k, RKM
+tunes k and q, and FPDC tunes k, q, and nu.
+:::
+
+---
+
+## Backup: selected models {.backup .small-table}
+
+| Method  | Emb. | k | q | ν  | Runtime | Silh.  | CH     | Prob. silh. |
+|---------|------|---|---|----|---------|--------|--------|-------------|
+| K-means | 64   | 4 | — | —  | 7.35    | -0.011 | 96.96  | —           |
+| PD      | 64   | 2 | — | —  | 0.29    | 0.003  | 10.14  | 0.093       |
+| RKM     | 64   | 2 | 2 | —  | 278.90  | 0.235  | 132.29 | —           |
+| FPDC    | 64   | 2 | 4 | 6  | 241.74  | 0.012  | 70.55  | 0.143       |
+| K-means | 128  | 4 | — | —  | 12.72   | -0.010 | 91.21  | —           |
+| PD      | 128  | 2 | — | —  | 0.18    | 0.000  | 0.92   | 0.068       |
+| **RKM** | **128** | **2** | **4** | — | **184.10** | **0.331** | **139.52** | — |
+| FPDC    | 128  | 4 | 2 | 6  | 188.16  | -0.115 | 56.43  | 0.136       |
+| K-means | 256  | 4 | — | —  | 23.45   | 0.026  | 74.77  | —           |
+| PD      | 256  | 2 | — | —  | 0.26    | 0.000  | 1.07   | 0.062       |
+| RKM     | 256  | 2 | 5 | —  | 257.64  | 0.290  | 111.25 | —           |
+| FPDC    | 256  | 6 | 3 | 10 | 70.74   | -0.209 | 33.92  | 0.148       |
+
+::: notes
+This table preserves the complete selected-model summary. The highlighted
+row is the main result used in the talk.
+:::
+
+---
+
+## Backup: FPDC sensitivity to ν {.backup .small-table}
+
+| Embedding | ν  | k | q | Silhouette | CH    | Prob. silh. |
+|-----------|----|---|---|------------|-------|-------------|
+| 64        | 6  | 2 | 4 | 0.012      | 70.55 | 0.143       |
+| 64        | 10 | 2 | 4 | 0.012      | 69.93 | 0.143       |
+| 128       | 6  | 4 | 2 | -0.115     | 56.43 | 0.136       |
+| 128       | 10 | 4 | 2 | -0.115     | 56.59 | 0.136       |
+| 256       | 6  | 3 | 2 | -0.056     | 63.41 | 0.146       |
+| 256       | 10 | 6 | 3 | -0.209     | 33.92 | 0.148       |
+
+::: {.takeaway}
+FPDC improved probability silhouette relative to PD, but not hard
+partition quality.
+:::
+
+::: notes
+This slide explains the tension in FPDC. Increasing or changing nu can
+slightly improve the soft-membership diagnostic while still producing
+poor ordinary silhouette values.
+:::
